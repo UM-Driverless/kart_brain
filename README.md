@@ -49,3 +49,7 @@ ros2 launch kart_bringup teleop_launch.py
 ## Test Media
 Pulled from https://github.com/UM-Driverless/driverless and stored locally at
 `test_data/driverless_test_media`.
+
+## YOLO Weights
+Pulled from https://github.com/UM-Driverless/driverless and stored locally at
+`models/perception/yolo/best_adri.pt`.
