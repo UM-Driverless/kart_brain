@@ -12,6 +12,7 @@ public:
 
 private:
     void callback(const ackermann_msgs::msg::AckermannDriveStamped::SharedPtr msg);
+    int8_t clamp_s8(int value);
 
     int uart_fd_ = -1;
     rclcpp::Subscription<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr subscription_;

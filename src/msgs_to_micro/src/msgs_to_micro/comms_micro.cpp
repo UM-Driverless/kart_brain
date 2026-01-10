@@ -8,12 +8,13 @@
 
 Comms_micro::Comms_micro() : Node("comms_micro")
 {
-    const char *uart_device = "/dev/ttyTHS1";
+    this->declare_parameter("device", "/dev/ttyUSB0");
+    std::string uart_device = this->get_parameter("device").as_string();
     uart_fd_ = open(uart_device, O_RDWR | O_NOCTTY | O_NDELAY);
     if (uart_fd_ < 0) {
         RCLCPP_ERROR(this->get_logger(),
                     "No se pudo abrir %s: (%d) %s",
-                    uart_device, errno, strerror(errno));
+                    uart_device.c_str(), errno, strerror(errno));
         return;
     }
 
@@ -79,17 +80,17 @@ void Comms_micro::callback(const ackermann_msgs::msg::AckermannDriveStamped::Sha
         brake = -msg->drive.acceleration;
     }
 
-    int steering_uart = static_cast<int>((steering + 1.0f) * 127.5f);
+    int steering_uart = static_cast<int>(steering * 127.0f);
     int throttle_uart = static_cast<int>(throttle * 255.0f);
     int brake_uart = static_cast<int>(brake * 255.0f);
 
-    steering_uart = std::clamp(steering_uart, 0, 255);
+    int8_t steering_s8 = clamp_s8(steering_uart);
     throttle_uart = std::clamp(throttle_uart, 0, 255);
     brake_uart = std::clamp(brake_uart, 0, 255);
 
     uint8_t packet[4];
     packet[0] = 0xAA;
-    packet[1] = static_cast<uint8_t>(steering_uart);
+    packet[1] = static_cast<uint8_t>(steering_s8);
     packet[2] = static_cast<uint8_t>(throttle_uart);
     packet[3] = static_cast<uint8_t>(brake_uart);
 
@@ -108,4 +109,15 @@ void Comms_micro::callback(const ackermann_msgs::msg::AckermannDriveStamped::Sha
     if (total_written != bytes_to_send) {
         RCLCPP_ERROR(this->get_logger(), "Número de bytes enviados incorrecto por UART");
     }
+}
+
+int8_t Comms_micro::clamp_s8(int value)
+{
+    if (value > 127) {
+        return 127;
+    }
+    if (value < -127) {
+        return -127;
+    }
+    return static_cast<int8_t>(value);
 }
