@@ -53,3 +53,28 @@ Pulled from https://github.com/UM-Driverless/driverless and stored locally at
 ## YOLO Weights
 Pulled from https://github.com/UM-Driverless/driverless and stored locally at
 `models/perception/yolo/best_adri.pt`.
+
+## YOLO Quick Test
+Run YOLO on a test image or video and save annotated output.
+
+```bash
+python3 scripts/run_yolo_on_media.py \
+  --source test_data/driverless_test_media/cones_test.png \
+  --weights models/perception/yolo/best_adri.pt \
+  --output outputs/yolo
+```
+
+First run will download the YOLOv5 code via Torch Hub and cache it locally.
+
+## Running ROS Nodes
+Launch the image source and YOLO detector nodes on test media.
+
+```bash
+source /opt/ros/humble/setup.bash
+colcon build --packages-select kart_perception
+source install/setup.bash
+
+ros2 launch kart_perception perception_test.launch.py \
+  source:=test_data/driverless_test_media/cones_test.png \
+  weights:=models/perception/yolo/best_adri.pt
+```
