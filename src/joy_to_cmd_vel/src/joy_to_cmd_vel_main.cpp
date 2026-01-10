@@ -92,7 +92,7 @@ int main(int argc, char* argv[]) {
         RCLCPP_WARN(node->get_logger(), "Dead_zone parameter not found!");
     }
 
-    drive_pub = node->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("/ackermann_vel", 10);
+    drive_pub = node->create_publisher<ackermann_msgs::msg::AckermannDriveStamped>("/actuation_cmd", 10);
 
     auto joy_sub = node->create_subscription<sensor_msgs::msg::Joy>(
         "/joy", 10, joy2cmd_callback);

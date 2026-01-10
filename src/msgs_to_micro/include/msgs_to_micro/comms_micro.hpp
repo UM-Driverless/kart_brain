@@ -11,11 +11,10 @@ public:
     ~Comms_micro();
 
 private:
-    void callback(const ackermann_msgs::msg::AckermannDrive::SharedPtr msg);
+    void callback(const ackermann_msgs::msg::AckermannDriveStamped::SharedPtr msg);
 
     int uart_fd_ = -1;
-    rclcpp::Subscription<ackermann_msgs::msg::AckermannDrive>::SharedPtr subscription_;
+    rclcpp::Subscription<ackermann_msgs::msg::AckermannDriveStamped>::SharedPtr subscription_;
 };
 
 #endif  // COMMS_MICRO_HPP
-

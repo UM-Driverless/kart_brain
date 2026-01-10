@@ -26,7 +26,7 @@ ros2 run joy_to_cmd_vel joy_to_cmd_vel --ros-args --params-file src/kart_bringup
 ```
 
 ```bash
-ros2 topic echo /ackermann_vel
+ros2 topic echo /actuation_cmd
 ```
 
 ```bash

@@ -48,8 +48,8 @@ Comms_micro::Comms_micro() : Node("comms_micro")
         return;
     }
 
-    subscription_ = this->create_subscription<ackermann_msgs::msg::AckermannDrive>(
-        "/ackermann_vel", 10,
+    subscription_ = this->create_subscription<ackermann_msgs::msg::AckermannDriveStamped>(
+        "/actuation_cmd", 10,
         std::bind(&Comms_micro::callback, this, std::placeholders::_1));
 }
 
@@ -60,23 +60,23 @@ Comms_micro::~Comms_micro()
     }
 }
 
-void Comms_micro::callback(const ackermann_msgs::msg::AckermannDrive::SharedPtr msg)
+void Comms_micro::callback(const ackermann_msgs::msg::AckermannDriveStamped::SharedPtr msg)
 {
     if (uart_fd_ < 0) {
         RCLCPP_WARN(this->get_logger(), "UART no inicializado, ignorando mensaje");
         return;
     }
 
-    float steering = msg->steering_angle;
+    float steering = msg->drive.steering_angle;
     float throttle = 0.0f;
     float brake = 0.0f;
 
-    if (msg->acceleration > 0) {
-        throttle = msg->acceleration;
+    if (msg->drive.acceleration > 0) {
+        throttle = msg->drive.acceleration;
         brake = 0.0f;
     } else {
         throttle = 0.0f;
-        brake = -msg->acceleration;
+        brake = -msg->drive.acceleration;
     }
 
     int steering_uart = static_cast<int>((steering + 1.0f) * 127.5f);
