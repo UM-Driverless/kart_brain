@@ -10,6 +10,8 @@
   <buildtool_depend>ament_python</buildtool_depend>
 
   <exec_depend>rclpy</exec_depend>
+  <exec_depend>image_geometry</exec_depend>
+  <exec_depend>message_filters</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>visualization_msgs</exec_depend>
   <exec_depend>vision_msgs</exec_depend>

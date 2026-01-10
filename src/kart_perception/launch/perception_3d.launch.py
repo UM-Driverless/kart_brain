@@ -5,28 +5,25 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    source_arg = DeclareLaunchArgument(
-        "source",
-        default_value="test_data/driverless_test_media/image1.png",
-        description="Image, video, or directory path for replay.",
+    image_topic_arg = DeclareLaunchArgument(
+        "image_topic",
+        default_value="/zed/zed_node/rgb/image_rect_color",
+        description="RGB image topic for YOLO inference.",
+    )
+    depth_topic_arg = DeclareLaunchArgument(
+        "depth_topic",
+        default_value="/zed/zed_node/depth/depth_registered",
+        description="Aligned depth image topic.",
+    )
+    camera_info_arg = DeclareLaunchArgument(
+        "camera_info_topic",
+        default_value="/zed/zed_node/rgb/camera_info",
+        description="CameraInfo for RGB/depth alignment.",
     )
     weights_arg = DeclareLaunchArgument(
         "weights",
         default_value="models/perception/yolo/best_adri.pt",
         description="Path to YOLOv5 weights.",
-    )
-
-    image_source = Node(
-        package="kart_perception",
-        executable="image_source",
-        name="image_source",
-        output="screen",
-        parameters=[
-            {
-                "source": LaunchConfiguration("source"),
-                "image_topic": "/image_raw",
-            }
-        ],
     )
 
     yolo_detector = Node(
@@ -36,7 +33,7 @@ def generate_launch_description():
         output="screen",
         parameters=[
             {
-                "image_topic": "/image_raw",
+                "image_topic": LaunchConfiguration("image_topic"),
                 "detections_topic": "/perception/cones_2d",
                 "debug_image_topic": "/perception/yolo/annotated",
                 "weights_path": LaunchConfiguration("weights"),
@@ -44,35 +41,28 @@ def generate_launch_description():
         ],
     )
 
-    marker_viz = Node(
+    cone_localizer = Node(
         package="kart_perception",
-        executable="cone_marker_viz",
-        name="cone_marker_viz",
+        executable="cone_depth_localizer",
+        name="cone_depth_localizer",
         output="screen",
         parameters=[
             {
                 "detections_topic": "/perception/cones_2d",
-                "markers_topic": "/perception/cones_markers",
-                "pixel_scale": 0.01,
+                "depth_topic": LaunchConfiguration("depth_topic"),
+                "camera_info_topic": LaunchConfiguration("camera_info_topic"),
+                "output_topic": "/perception/cones_3d",
             }
         ],
     )
 
-    static_tf = Node(
-        package="tf2_ros",
-        executable="static_transform_publisher",
-        name="static_tf_map_camera",
-        output="screen",
-        arguments=["0", "0", "0", "0", "0", "0", "map", "camera"],
-    )
-
     return LaunchDescription(
         [
-            source_arg,
+            image_topic_arg,
+            depth_topic_arg,
+            camera_info_arg,
             weights_arg,
-            image_source,
             yolo_detector,
-            marker_viz,
-            static_tf,
+            cone_localizer,
         ]
     )

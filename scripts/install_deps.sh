@@ -11,7 +11,9 @@ sudo apt-get install -y \
   python3-opencv \
   ros-humble-ackermann-msgs \
   ros-humble-cv-bridge \
+  ros-humble-image-geometry \
   ros-humble-joy \
+  ros-humble-message-filters \
   ros-humble-vision-msgs \
   ros-humble-zed-msgs
 

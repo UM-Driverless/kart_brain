@@ -27,11 +27,13 @@ class ConeMarkerVizNode(Node):
         self.declare_parameter("markers_topic", "/perception/cones_markers")
         self.declare_parameter("frame_id", "camera")
         self.declare_parameter("marker_scale_z", 1.0)
+        self.declare_parameter("pixel_scale", 0.01)
 
         self.detections_topic = str(self.get_parameter("detections_topic").value)
         self.markers_topic = str(self.get_parameter("markers_topic").value)
         self.frame_id = str(self.get_parameter("frame_id").value)
         self.marker_scale_z = float(self.get_parameter("marker_scale_z").value)
+        self.pixel_scale = float(self.get_parameter("pixel_scale").value)
 
         self.publisher = self.create_publisher(MarkerArray, self.markers_topic, 10)
         self.subscription = self.create_subscription(
@@ -60,12 +62,12 @@ class ConeMarkerVizNode(Node):
             marker_id += 1
             marker.type = Marker.CUBE
             marker.action = Marker.ADD
-            marker.pose.position.x = bbox.center.position.x
-            marker.pose.position.y = bbox.center.position.y
+            marker.pose.position.x = bbox.center.position.x * self.pixel_scale
+            marker.pose.position.y = bbox.center.position.y * self.pixel_scale
             marker.pose.position.z = 0.0
             marker.pose.orientation.w = 1.0
-            marker.scale.x = bbox.size_x
-            marker.scale.y = bbox.size_y
+            marker.scale.x = max(0.01, bbox.size_x * self.pixel_scale)
+            marker.scale.y = max(0.01, bbox.size_y * self.pixel_scale)
             marker.scale.z = self.marker_scale_z
             marker.color.r = color[0]
             marker.color.g = color[1]
@@ -80,11 +82,11 @@ class ConeMarkerVizNode(Node):
             marker_id += 1
             text_marker.type = Marker.TEXT_VIEW_FACING
             text_marker.action = Marker.ADD
-            text_marker.pose.position.x = bbox.center.position.x
-            text_marker.pose.position.y = bbox.center.position.y
-            text_marker.pose.position.z = self.marker_scale_z + 5.0
+            text_marker.pose.position.x = bbox.center.position.x * self.pixel_scale
+            text_marker.pose.position.y = bbox.center.position.y * self.pixel_scale
+            text_marker.pose.position.z = self.marker_scale_z + 0.5
             text_marker.pose.orientation.w = 1.0
-            text_marker.scale.z = max(10.0, self.marker_scale_z * 2.0)
+            text_marker.scale.z = max(0.1, self.marker_scale_z * 0.4)
             text_marker.color.r = color[0]
             text_marker.color.g = color[1]
             text_marker.color.b = color[2]
