@@ -56,6 +56,19 @@ def generate_launch_description():
         ],
     )
 
+    marker_viz_3d = Node(
+        package="kart_perception",
+        executable="cone_marker_viz_3d",
+        name="cone_marker_viz_3d",
+        output="screen",
+        parameters=[
+            {
+                "detections_topic": "/perception/cones_3d",
+                "markers_topic": "/perception/cones_3d_markers",
+            }
+        ],
+    )
+
     return LaunchDescription(
         [
             image_topic_arg,
@@ -64,5 +77,6 @@ def generate_launch_description():
             weights_arg,
             yolo_detector,
             cone_localizer,
+            marker_viz_3d,
         ]
     )

@@ -31,6 +31,7 @@ setup(
             "yolo_detector = kart_perception.yolo_detector_node:main",
             "cone_marker_viz = kart_perception.cone_marker_viz_node:main",
             "cone_depth_localizer = kart_perception.cone_depth_localizer_node:main",
+            "cone_marker_viz_3d = kart_perception.cone_marker_viz_3d_node:main",
         ],
     },
 )
