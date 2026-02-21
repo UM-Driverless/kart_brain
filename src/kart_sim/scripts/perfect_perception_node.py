@@ -1,0 +1,247 @@
+#!/usr/bin/env python3
+"""Perfect perception node: reads cone positions from the SDF world
+and publishes them as Detection3DArray relative to the kart's camera frame.
+
+This bypasses YOLO entirely — useful for testing the control loop before
+the vision pipeline works on Gazebo-rendered images.
+"""
+import math
+import re
+from typing import Dict, List, Tuple
+
+import rclpy
+from rclpy.node import Node
+from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
+from geometry_msgs.msg import TransformStamped
+from nav_msgs.msg import Odometry
+from sensor_msgs.msg import CameraInfo
+from tf2_ros import TransformBroadcaster
+from vision_msgs.msg import (
+    BoundingBox3D,
+    Detection3D,
+    Detection3DArray,
+    ObjectHypothesisWithPose,
+)
+
+
+# Cone world positions extracted from the SDF (name -> (x, y, z, class_id))
+# These are populated at startup by parsing the world file.
+CONE_CLASSES = {
+    "blue": "blue_cone",
+    "yellow": "yellow_cone",
+    "orange": "orange_cone",
+}
+
+
+def parse_cones_from_sdf(sdf_path: str) -> List[Dict]:
+    """Parse cone model positions and colors from the world SDF file."""
+    cones = []
+    with open(sdf_path, "r") as f:
+        content = f.read()
+
+    # Find all inline cone models (name pattern: color_section_index)
+    pattern = r'<model name="((?:blue|yellow|orange)_\w+)".*?<pose>([\d\s.eE+\-]+)</pose>'
+    for match in re.finditer(pattern, content, re.DOTALL):
+        name = match.group(1)
+        pose_str = match.group(2).strip().split()
+        x, y, z = float(pose_str[0]), float(pose_str[1]), float(pose_str[2])
+
+        # Determine class from name prefix
+        if name.startswith("blue"):
+            class_id = "blue_cone"
+        elif name.startswith("yellow"):
+            class_id = "yellow_cone"
+        elif name.startswith("orange"):
+            class_id = "orange_cone"
+        else:
+            continue
+
+        cones.append({"name": name, "x": x, "y": y, "z": z, "class_id": class_id})
+
+    return cones
+
+
+class PerfectPerceptionNode(Node):
+    def __init__(self):
+        super().__init__("perfect_perception")
+
+        self.declare_parameter("world_sdf", "")
+        self.declare_parameter("output_topic", "/perception/cones_3d")
+        self.declare_parameter("camera_info_topic", "/zed/zed_node/rgb/camera_info")
+        self.declare_parameter("max_range", 20.0)
+        self.declare_parameter("fov_deg", 80.0)
+        self.declare_parameter("publish_rate", 10.0)
+        self.declare_parameter("camera_frame", "camera_link")
+        # Camera offset from base_link (matching the kart model)
+        self.declare_parameter("camera_x_offset", 0.55)
+        self.declare_parameter("camera_z_offset", 0.47)
+        # Kart initial world pose (odom is relative to this)
+        self.declare_parameter("kart_start_x", 20.0)
+        self.declare_parameter("kart_start_y", 0.0)
+        self.declare_parameter("kart_start_yaw", 1.5708)
+
+        sdf_path = str(self.get_parameter("world_sdf").value)
+        self.output_topic = str(self.get_parameter("output_topic").value)
+        self.camera_info_topic = str(self.get_parameter("camera_info_topic").value)
+        self.max_range = float(self.get_parameter("max_range").value)
+        self.fov_rad = math.radians(float(self.get_parameter("fov_deg").value))
+        publish_rate = float(self.get_parameter("publish_rate").value)
+        self.camera_frame = str(self.get_parameter("camera_frame").value)
+        self.cam_x = float(self.get_parameter("camera_x_offset").value)
+        self.cam_z = float(self.get_parameter("camera_z_offset").value)
+        self.start_x = float(self.get_parameter("kart_start_x").value)
+        self.start_y = float(self.get_parameter("kart_start_y").value)
+        self.start_yaw = float(self.get_parameter("kart_start_yaw").value)
+
+        # Parse cones from SDF
+        if sdf_path:
+            self.cones = parse_cones_from_sdf(sdf_path)
+            self.get_logger().info(f"Loaded {len(self.cones)} cones from {sdf_path}")
+        else:
+            self.cones = []
+            self.get_logger().warn("No world_sdf parameter set — no cones loaded")
+
+        # Publisher
+        self.pub = self.create_publisher(Detection3DArray, self.output_topic, 10)
+
+        # Also publish a fake CameraInfo so the depth localizer is happy
+        self.cam_info_pub = self.create_publisher(CameraInfo, self.camera_info_topic, 10)
+
+        # TF broadcaster for camera frame
+        self.tf_broadcaster = TransformBroadcaster(self)
+
+        # Subscribe to kart odometry (from Gazebo bridge)
+        odom_qos = QoSProfile(
+            depth=10,
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            durability=DurabilityPolicy.VOLATILE,
+        )
+        self.odom_sub = self.create_subscription(
+            Odometry, "/model/kart/odometry", self._on_odom, odom_qos
+        )
+
+        # Current kart pose
+        self.kart_x = 0.0
+        self.kart_y = 0.0
+        self.kart_yaw = 0.0
+        self.got_odom = False
+
+        # Timer
+        self.timer = self.create_timer(1.0 / publish_rate, self._publish)
+
+    def _on_odom(self, msg: Odometry):
+        # Odom is in the kart's start frame — transform to world frame
+        odom_x = msg.pose.pose.position.x
+        odom_y = msg.pose.pose.position.y
+        q = msg.pose.pose.orientation
+        siny_cosp = 2.0 * (q.w * q.z + q.x * q.y)
+        cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z)
+        odom_yaw = math.atan2(siny_cosp, cosy_cosp)
+
+        # Transform odom pose to world frame
+        cos_s = math.cos(self.start_yaw)
+        sin_s = math.sin(self.start_yaw)
+        self.kart_x = self.start_x + odom_x * cos_s - odom_y * sin_s
+        self.kart_y = self.start_y + odom_x * sin_s + odom_y * cos_s
+        self.kart_yaw = self.start_yaw + odom_yaw
+        self.got_odom = True
+
+    def _publish(self):
+        if not self.got_odom or not self.cones:
+            return
+
+        now = self.get_clock().now().to_msg()
+
+        # Camera position in world frame
+        cos_yaw = math.cos(self.kart_yaw)
+        sin_yaw = math.sin(self.kart_yaw)
+        cam_world_x = self.kart_x + self.cam_x * cos_yaw
+        cam_world_y = self.kart_y + self.cam_x * sin_yaw
+
+        out = Detection3DArray()
+        out.header.stamp = now
+        out.header.frame_id = self.camera_frame
+
+        half_fov = self.fov_rad / 2.0
+
+        for cone in self.cones:
+            # Vector from camera to cone in world frame
+            dx = cone["x"] - cam_world_x
+            dy = cone["y"] - cam_world_y
+
+            # Transform to camera frame (camera looks along +X in kart frame)
+            # Camera frame: X=forward, Y=left, Z=up
+            cx = dx * cos_yaw + dy * sin_yaw
+            cy = -dx * sin_yaw + dy * cos_yaw
+
+            dist = math.sqrt(cx * cx + cy * cy)
+            if dist > self.max_range or dist < 0.5:
+                continue
+
+            # Check FOV (angle from forward axis)
+            angle = math.atan2(cy, cx)
+            if abs(angle) > half_fov:
+                continue
+
+            # In camera optical frame: Z=forward, X=right, Y=down
+            # But perception nodes expect camera_link frame where X=forward
+            # So publish in camera_link frame directly
+            det = Detection3D()
+            det.header = out.header
+
+            hyp = ObjectHypothesisWithPose()
+            hyp.hypothesis.class_id = cone["class_id"]
+            hyp.hypothesis.score = 1.0
+            hyp.pose.pose.position.x = cx
+            hyp.pose.pose.position.y = cy
+            hyp.pose.pose.position.z = cone["z"]
+            hyp.pose.pose.orientation.w = 1.0
+            det.results.append(hyp)
+
+            bbox = BoundingBox3D()
+            bbox.center.position.x = cx
+            bbox.center.position.y = cy
+            bbox.center.position.z = cone["z"]
+            bbox.center.orientation.w = 1.0
+            bbox.size.x = 0.25
+            bbox.size.y = 0.25
+            bbox.size.z = 0.325
+            det.bbox = bbox
+
+            out.detections.append(det)
+
+        self.pub.publish(out)
+
+        # Broadcast TF: odom -> base_link -> camera_link
+        t = TransformStamped()
+        t.header.stamp = now
+        t.header.frame_id = "odom"
+        t.child_frame_id = "base_link"
+        t.transform.translation.x = self.kart_x
+        t.transform.translation.y = self.kart_y
+        t.transform.translation.z = 0.15
+        # Quaternion from yaw
+        t.transform.rotation.z = math.sin(self.kart_yaw / 2.0)
+        t.transform.rotation.w = math.cos(self.kart_yaw / 2.0)
+        self.tf_broadcaster.sendTransform(t)
+
+        t2 = TransformStamped()
+        t2.header.stamp = now
+        t2.header.frame_id = "base_link"
+        t2.child_frame_id = self.camera_frame
+        t2.transform.translation.x = self.cam_x
+        t2.transform.translation.z = self.cam_z - 0.15
+        t2.transform.rotation.w = 1.0
+        self.tf_broadcaster.sendTransform(t2)
+
+
+def main():
+    rclpy.init()
+    node = PerfectPerceptionNode()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
+
+
+if __name__ == "__main__":
+    main()

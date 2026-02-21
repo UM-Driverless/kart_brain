@@ -1,0 +1,333 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <model name="kart">
+    <pose>0 0 0.22 0 0 0</pose>
+
+    <!-- Chassis -->
+    <link name="chassis">
+      <inertial>
+        <mass>80</mass>
+        <inertia>
+          <ixx>5.0</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>12.0</iyy><iyz>0</iyz>
+          <izz>14.0</izz>
+        </inertia>
+      </inertial>
+      <visual name="chassis_visual">
+        <geometry>
+          <box><size>1.4 0.8 0.2</size></box>
+        </geometry>
+        <material>
+          <ambient>0.3 0.3 0.3 1</ambient>
+          <diffuse>0.3 0.3 0.3 1</diffuse>
+        </material>
+      </visual>
+      <collision name="chassis_collision">
+        <geometry>
+          <box><size>1.4 0.8 0.2</size></box>
+        </geometry>
+      </collision>
+    </link>
+
+    <!-- Camera mount (on top of chassis, front) -->
+    <link name="camera_link">
+      <pose relative_to="chassis">0.55 0 0.25 0 0 0</pose>
+      <inertial>
+        <mass>0.1</mass>
+        <inertia>
+          <ixx>0.001</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.001</iyy><iyz>0</iyz>
+          <izz>0.001</izz>
+        </inertia>
+      </inertial>
+      <visual name="camera_visual">
+        <geometry>
+          <box><size>0.05 0.12 0.04</size></box>
+        </geometry>
+        <material>
+          <ambient>0.1 0.1 0.1 1</ambient>
+          <diffuse>0.1 0.1 0.1 1</diffuse>
+        </material>
+      </visual>
+      <sensor name="rgbd_camera" type="rgbd_camera">
+        <always_on>1</always_on>
+        <update_rate>10</update_rate>
+        <camera>
+          <horizontal_fov>1.396</horizontal_fov>
+          <image>
+            <width>640</width>
+            <height>360</height>
+            <format>R8G8B8</format>
+          </image>
+          <clip>
+            <near>0.1</near>
+            <far>50</far>
+          </clip>
+          <depth_camera>
+            <clip>
+              <near>0.1</near>
+              <far>50</far>
+            </clip>
+          </depth_camera>
+        </camera>
+        <topic>kart/rgbd</topic>
+      </sensor>
+    </link>
+
+    <joint name="camera_joint" type="fixed">
+      <parent>chassis</parent>
+      <child>camera_link</child>
+    </joint>
+
+    <!-- Front left steering knuckle -->
+    <link name="front_left_steering">
+      <pose relative_to="chassis">0.525 0.55 -0.05 0 0 0</pose>
+      <inertial>
+        <mass>0.5</mass>
+        <inertia>
+          <ixx>0.01</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.01</iyy><iyz>0</iyz>
+          <izz>0.01</izz>
+        </inertia>
+      </inertial>
+    </link>
+
+    <!-- Front right steering knuckle -->
+    <link name="front_right_steering">
+      <pose relative_to="chassis">0.525 -0.55 -0.05 0 0 0</pose>
+      <inertial>
+        <mass>0.5</mass>
+        <inertia>
+          <ixx>0.01</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.01</iyy><iyz>0</iyz>
+          <izz>0.01</izz>
+        </inertia>
+      </inertial>
+    </link>
+
+    <!-- Front left wheel -->
+    <link name="front_left_wheel">
+      <pose relative_to="front_left_steering">0 0.05 0 -1.5707963 0 0</pose>
+      <inertial>
+        <mass>3</mass>
+        <inertia>
+          <ixx>0.02</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.02</iyy><iyz>0</iyz>
+          <izz>0.03</izz>
+        </inertia>
+      </inertial>
+      <visual name="visual">
+        <geometry>
+          <cylinder><radius>0.15</radius><length>0.1</length></cylinder>
+        </geometry>
+        <material>
+          <ambient>0.1 0.1 0.1 1</ambient>
+          <diffuse>0.1 0.1 0.1 1</diffuse>
+        </material>
+      </visual>
+      <collision name="collision">
+        <geometry>
+          <sphere><radius>0.15</radius></sphere>
+        </geometry>
+        <surface>
+          <friction>
+            <ode><mu>1.2</mu><mu2>0.8</mu2></ode>
+          </friction>
+        </surface>
+      </collision>
+    </link>
+
+    <!-- Front right wheel -->
+    <link name="front_right_wheel">
+      <pose relative_to="front_right_steering">0 -0.05 0 -1.5707963 0 0</pose>
+      <inertial>
+        <mass>3</mass>
+        <inertia>
+          <ixx>0.02</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.02</iyy><iyz>0</iyz>
+          <izz>0.03</izz>
+        </inertia>
+      </inertial>
+      <visual name="visual">
+        <geometry>
+          <cylinder><radius>0.15</radius><length>0.1</length></cylinder>
+        </geometry>
+        <material>
+          <ambient>0.1 0.1 0.1 1</ambient>
+          <diffuse>0.1 0.1 0.1 1</diffuse>
+        </material>
+      </visual>
+      <collision name="collision">
+        <geometry>
+          <sphere><radius>0.15</radius></sphere>
+        </geometry>
+        <surface>
+          <friction>
+            <ode><mu>1.2</mu><mu2>0.8</mu2></ode>
+          </friction>
+        </surface>
+      </collision>
+    </link>
+
+    <!-- Rear left wheel -->
+    <link name="rear_left_wheel">
+      <pose relative_to="chassis">-0.525 0.6 -0.05 -1.5707963 0 0</pose>
+      <inertial>
+        <mass>3</mass>
+        <inertia>
+          <ixx>0.02</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.02</iyy><iyz>0</iyz>
+          <izz>0.03</izz>
+        </inertia>
+      </inertial>
+      <visual name="visual">
+        <geometry>
+          <cylinder><radius>0.15</radius><length>0.1</length></cylinder>
+        </geometry>
+        <material>
+          <ambient>0.1 0.1 0.1 1</ambient>
+          <diffuse>0.1 0.1 0.1 1</diffuse>
+        </material>
+      </visual>
+      <collision name="collision">
+        <geometry>
+          <sphere><radius>0.15</radius></sphere>
+        </geometry>
+        <surface>
+          <friction>
+            <ode><mu>1.2</mu><mu2>0.8</mu2></ode>
+          </friction>
+        </surface>
+      </collision>
+    </link>
+
+    <!-- Rear right wheel -->
+    <link name="rear_right_wheel">
+      <pose relative_to="chassis">-0.525 -0.6 -0.05 -1.5707963 0 0</pose>
+      <inertial>
+        <mass>3</mass>
+        <inertia>
+          <ixx>0.02</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>0.02</iyy><iyz>0</iyz>
+          <izz>0.03</izz>
+        </inertia>
+      </inertial>
+      <visual name="visual">
+        <geometry>
+          <cylinder><radius>0.15</radius><length>0.1</length></cylinder>
+        </geometry>
+        <material>
+          <ambient>0.1 0.1 0.1 1</ambient>
+          <diffuse>0.1 0.1 0.1 1</diffuse>
+        </material>
+      </visual>
+      <collision name="collision">
+        <geometry>
+          <sphere><radius>0.15</radius></sphere>
+        </geometry>
+        <surface>
+          <friction>
+            <ode><mu>1.2</mu><mu2>0.8</mu2></ode>
+          </friction>
+        </surface>
+      </collision>
+    </link>
+
+    <!-- Steering joints (front) -->
+    <joint name="front_left_steering_joint" type="revolute">
+      <parent>chassis</parent>
+      <child>front_left_steering</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-0.6</lower>
+          <upper>0.6</upper>
+          <effort>1e6</effort>
+        </limit>
+      </axis>
+    </joint>
+
+    <joint name="front_right_steering_joint" type="revolute">
+      <parent>chassis</parent>
+      <child>front_right_steering</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-0.6</lower>
+          <upper>0.6</upper>
+          <effort>1e6</effort>
+        </limit>
+      </axis>
+    </joint>
+
+    <!-- Wheel spin joints -->
+    <joint name="front_left_wheel_joint" type="revolute">
+      <parent>front_left_steering</parent>
+      <child>front_left_wheel</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-1e16</lower>
+          <upper>1e16</upper>
+        </limit>
+      </axis>
+    </joint>
+
+    <joint name="front_right_wheel_joint" type="revolute">
+      <parent>front_right_steering</parent>
+      <child>front_right_wheel</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-1e16</lower>
+          <upper>1e16</upper>
+        </limit>
+      </axis>
+    </joint>
+
+    <joint name="rear_left_wheel_joint" type="revolute">
+      <parent>chassis</parent>
+      <child>rear_left_wheel</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-1e16</lower>
+          <upper>1e16</upper>
+        </limit>
+      </axis>
+    </joint>
+
+    <joint name="rear_right_wheel_joint" type="revolute">
+      <parent>chassis</parent>
+      <child>rear_right_wheel</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-1e16</lower>
+          <upper>1e16</upper>
+        </limit>
+      </axis>
+    </joint>
+
+    <!-- Ackermann steering plugin -->
+    <plugin
+      filename="ignition-gazebo-ackermann-steering-system"
+      name="ignition::gazebo::systems::AckermannSteering">
+      <topic>kart/cmd_vel</topic>
+      <left_joint>front_left_wheel_joint</left_joint>
+      <right_joint>front_right_wheel_joint</right_joint>
+      <left_steering_joint>front_left_steering_joint</left_steering_joint>
+      <right_steering_joint>front_right_steering_joint</right_steering_joint>
+      <kingpin_width>1.1</kingpin_width>
+      <steering_limit>0.5</steering_limit>
+      <wheel_base>1.05</wheel_base>
+      <wheel_separation>1.2</wheel_separation>
+      <wheel_radius>0.15</wheel_radius>
+      <min_velocity>-3.0</min_velocity>
+      <max_velocity>5.0</max_velocity>
+      <min_acceleration>-3.0</min_acceleration>
+      <max_acceleration>2.0</max_acceleration>
+    </plugin>
+
+  </model>
+</sdf>
