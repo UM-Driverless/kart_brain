@@ -9,6 +9,8 @@ install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch)
 install(PROGRAMS
   scripts/cone_follower_node.py
   scripts/perfect_perception_node.py
+  scripts/capture_frames.py
+  scripts/evaluate_perception.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

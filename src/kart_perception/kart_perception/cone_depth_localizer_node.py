@@ -29,6 +29,7 @@ class ConeDepthLocalizerNode(Node):
         self.declare_parameter("min_depth_m", 0.3)
         self.declare_parameter("max_depth_m", 40.0)
         self.declare_parameter("default_box_size_m", 0.25)
+        self.declare_parameter("sync_slop", 2.0)
 
         self.detections_topic = str(self.get_parameter("detections_topic").value)
         self.depth_topic = str(self.get_parameter("depth_topic").value)
@@ -50,7 +51,7 @@ class ConeDepthLocalizerNode(Node):
         self.info_sub = Subscriber(self, CameraInfo, self.camera_info_topic)
 
         self.sync = ApproximateTimeSynchronizer(
-            [self.det_sub, self.depth_sub, self.info_sub], queue_size=10, slop=0.1
+            [self.det_sub, self.depth_sub, self.info_sub], queue_size=30, slop=float(self.get_parameter("sync_slop").value)
         )
         self.sync.registerCallback(self._on_synced)
 

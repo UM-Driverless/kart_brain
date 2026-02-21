@@ -1,20 +1,23 @@
 <?xml version="1.0"?>
 <sdf version="1.9">
-  <model name="cone_yellow">
+  <!-- Big orange cone for start/finish line (FSG: 285mm base, 505mm tall) -->
+  <!-- Uses small orange mesh scaled up: X/Y × 1.27, Z × 1.66 -->
+  <model name="cone_orange_big">
     <static>true</static>
     <link name="link">
       <visual name="visual">
         <geometry>
           <mesh>
-            <uri>model://cone_yellow/meshes/cone_yellow.dae</uri>
+            <uri>model://cone_orange_big/meshes/cone_orange.dae</uri>
+            <scale>1.27 1.27 1.66</scale>
           </mesh>
         </geometry>
       </visual>
       <collision name="collision">
         <geometry>
           <cylinder>
-            <radius>0.114</radius>
-            <length>0.325</length>
+            <radius>0.1425</radius>
+            <length>0.505</length>
           </cylinder>
         </geometry>
       </collision>

@@ -33,30 +33,51 @@ CONE_CLASSES = {
 }
 
 
+def _class_from_name(name: str) -> str:
+    """Determine cone class_id from model name prefix."""
+    if name.startswith("blue"):
+        return "blue_cone"
+    elif name.startswith("yellow"):
+        return "yellow_cone"
+    elif name.startswith("orange"):
+        return "orange_cone"
+    return ""
+
+
 def parse_cones_from_sdf(sdf_path: str) -> List[Dict]:
-    """Parse cone model positions and colors from the world SDF file."""
+    """Parse cone model positions and colors from the world SDF file.
+
+    Supports both inline <model> definitions and <include> tags.
+    """
     cones = []
     with open(sdf_path, "r") as f:
         content = f.read()
 
-    # Find all inline cone models (name pattern: color_section_index)
-    pattern = r'<model name="((?:blue|yellow|orange)_\w+)".*?<pose>([\d\s.eE+\-]+)</pose>'
-    for match in re.finditer(pattern, content, re.DOTALL):
+    # Match inline cone models: <model name="blue_rs_0">...<pose>...</pose>
+    inline_pat = r'<model name="((?:blue|yellow|orange)_\w+)".*?<pose>([\d\s.eE+\-]+)</pose>'
+    for match in re.finditer(inline_pat, content, re.DOTALL):
         name = match.group(1)
         pose_str = match.group(2).strip().split()
         x, y, z = float(pose_str[0]), float(pose_str[1]), float(pose_str[2])
+        class_id = _class_from_name(name)
+        if class_id:
+            cones.append({"name": name, "x": x, "y": y, "z": z, "class_id": class_id})
 
-        # Determine class from name prefix
-        if name.startswith("blue"):
-            class_id = "blue_cone"
-        elif name.startswith("yellow"):
-            class_id = "yellow_cone"
-        elif name.startswith("orange"):
-            class_id = "orange_cone"
-        else:
-            continue
-
-        cones.append({"name": name, "x": x, "y": y, "z": z, "class_id": class_id})
+    # Match <include> tags: <include><uri>model://cone_*</uri><name>...</name><pose>...</pose></include>
+    include_pat = (
+        r'<include>\s*'
+        r'<uri>model://cone_\w+</uri>\s*'
+        r'<name>((?:blue|yellow|orange)_\w+)</name>\s*'
+        r'<pose>([\d\s.eE+\-]+)</pose>\s*'
+        r'</include>'
+    )
+    for match in re.finditer(include_pat, content, re.DOTALL):
+        name = match.group(1)
+        pose_str = match.group(2).strip().split()
+        x, y, z = float(pose_str[0]), float(pose_str[1]), float(pose_str[2])
+        class_id = _class_from_name(name)
+        if class_id:
+            cones.append({"name": name, "x": x, "y": y, "z": z, "class_id": class_id})
 
     return cones
 

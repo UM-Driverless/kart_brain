@@ -1,12 +1,15 @@
 """Master launch file for the kart simulation.
 
 Starts:
-1. Gazebo server (headless, initially paused)
+1. Gazebo server (headless)
 2. ros_gz_bridge (topic bridging)
-3. Perfect perception node (bypasses YOLO)
+3. Perfect perception node OR YOLO perception pipeline
 4. Cone follower control node
-5. Unpause simulation
-6. (Optional) Perception pipeline via perception_3d.launch.py
+5. Cone marker visualization
+
+Launch arguments:
+    use_yolo:=true   → Launch YOLO pipeline (yolo_detector + cone_depth_localizer)
+    use_yolo:=false  → Launch perfect perception (ground truth from SDF) [default]
 """
 import os
 
@@ -18,7 +21,7 @@ from launch.actions import (
     IncludeLaunchDescription,
     TimerAction,
 )
-from launch.conditions import IfCondition
+from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -29,15 +32,10 @@ def generate_launch_description():
     world_file = os.path.join(pkg_kart_sim, "worlds", "fs_track.sdf")
     model_path = os.path.join(pkg_kart_sim, "models")
 
-    use_perception_arg = DeclareLaunchArgument(
-        "use_perception",
+    use_yolo_arg = DeclareLaunchArgument(
+        "use_yolo",
         default_value="false",
-        description="Launch the full YOLO perception pipeline (requires weights).",
-    )
-    use_perfect_perception_arg = DeclareLaunchArgument(
-        "use_perfect_perception",
-        default_value="true",
-        description="Use perfect perception (ground truth from SDF).",
+        description="Use YOLO perception instead of perfect perception.",
     )
 
     # --- 1. Gazebo Server (headless) ---
@@ -74,7 +72,7 @@ def generate_launch_description():
         output="screen",
     )
 
-    # --- 3. Perfect perception node ---
+    # --- 3a. Perfect perception node (when use_yolo=false) ---
     perfect_perception = Node(
         package="kart_sim",
         executable="perfect_perception_node.py",
@@ -93,8 +91,35 @@ def generate_launch_description():
                 "kart_start_yaw": 1.5708,
             }
         ],
-        condition=IfCondition(LaunchConfiguration("use_perfect_perception")),
+        condition=UnlessCondition(LaunchConfiguration("use_yolo")),
     )
+
+    # --- 3b. YOLO perception pipeline (when use_yolo=true) ---
+    # Find YOLO weights relative to workspace
+    weights_path = os.path.join(
+        os.path.expanduser("~"), "kart_sw", "models", "perception", "yolo", "best_adri.pt"
+    )
+    try:
+        pkg_perception = get_package_share_directory("kart_perception")
+        perception_launch = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(pkg_perception, "launch", "perception_3d.launch.py")
+            ),
+            launch_arguments={
+                "image_topic": "/zed/zed_node/rgb/image_rect_color",
+                "depth_topic": "/zed/zed_node/depth/depth_registered",
+                "camera_info_topic": "/zed/zed_node/rgb/camera_info",
+                "weights": weights_path,
+            }.items(),
+            condition=IfCondition(LaunchConfiguration("use_yolo")),
+        )
+    except Exception:
+        # kart_perception not built — provide a fallback error message
+        perception_launch = ExecuteProcess(
+            cmd=["echo", "ERROR: kart_perception package not found. Build it first."],
+            output="screen",
+            condition=IfCondition(LaunchConfiguration("use_yolo")),
+        )
 
     # --- 4. Cone follower control node ---
     cone_follower = Node(
@@ -114,52 +139,33 @@ def generate_launch_description():
         ],
     )
 
-    # --- 5. Optional: full perception pipeline ---
+    # --- 5. Cone marker visualization ---
     try:
-        pkg_perception = get_package_share_directory("kart_perception")
-        perception_launch = TimerAction(
-            period=10.0,
-            actions=[
-                IncludeLaunchDescription(
-                    PythonLaunchDescriptionSource(
-                        os.path.join(pkg_perception, "launch", "perception_3d.launch.py")
-                    ),
-                    launch_arguments={
-                        "image_topic": "/zed/zed_node/rgb/image_rect_color",
-                        "depth_topic": "/zed/zed_node/depth/depth_registered",
-                        "camera_info_topic": "/zed/zed_node/rgb/camera_info",
-                    }.items(),
-                    condition=IfCondition(LaunchConfiguration("use_perception")),
-                )
+        get_package_share_directory("kart_perception")
+        marker_viz = Node(
+            package="kart_perception",
+            executable="cone_marker_viz_3d",
+            name="cone_marker_viz_3d",
+            output="screen",
+            parameters=[
+                {
+                    "use_sim_time": True,
+                    "detections_topic": "/perception/cones_3d",
+                    "markers_topic": "/perception/cones_3d_markers",
+                }
             ],
         )
     except Exception:
-        perception_launch = TimerAction(period=1.0, actions=[])
-
-    # --- 7. Cone marker visualization ---
-    marker_viz = Node(
-        package="kart_perception",
-        executable="cone_marker_viz_3d",
-        name="cone_marker_viz_3d",
-        output="screen",
-        parameters=[
-            {
-                "use_sim_time": True,
-                "detections_topic": "/perception/cones_3d",
-                "markers_topic": "/perception/cones_3d_markers",
-            }
-        ],
-    )
+        marker_viz = ExecuteProcess(cmd=["true"], output="log")
 
     return LaunchDescription(
         [
-            use_perception_arg,
-            use_perfect_perception_arg,
+            use_yolo_arg,
             gazebo_server,
             TimerAction(period=3.0, actions=[bridge]),
             TimerAction(period=5.0, actions=[perfect_perception]),
+            TimerAction(period=8.0, actions=[perception_launch]),
             TimerAction(period=6.0, actions=[cone_follower]),
             TimerAction(period=5.0, actions=[marker_viz]),
-            perception_launch,
         ]
     )

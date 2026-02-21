@@ -2,7 +2,7 @@
 <sdf version="1.9">
   <world name="fs_track">
 
-    <!-- Physics: run as fast as CPU allows -->
+    <!-- Physics: run at wall-clock speed -->
     <physics name="sim" type="ode">
       <max_step_size>0.004</max_step_size>
       <real_time_update_rate>250</real_time_update_rate>
@@ -81,7 +81,7 @@
       </link>
     </model>
 
-    <!-- Kart (start position: facing +X) -->
+    <!-- Kart (start position: right straight, facing +Y) -->
     <include>
       <uri>model://kart</uri>
       <name>kart</name>
@@ -90,108 +90,81 @@
 
     <!--
       Oval track layout:
-      - Two straights (along X axis) connected by semicircles
-      - Blue cones on the LEFT boundary (inner for bottom straight, outer for top)
-      - Yellow cones on the RIGHT boundary
-      - Orange cones at start/finish
-      - Track width ~3m, cone spacing ~5m on straights, ~3m on curves
-      - Oval: straights at y=±8, semicircles at x=±15, radius ~8m
+      - Blue cones on the LEFT (inner) boundary
+      - Yellow cones on the RIGHT (outer) boundary
+      - Orange big cones at start/finish
+      - Track width ~3m, cone spacing ~5m on straights
+      - Kart starts at (20, 0) facing +Y, drives counterclockwise
 
-      Layout (top view):
-        Yellow (right boundary)  ----  inner on top straight
-        Blue (left boundary)     ----  outer on top straight
-
-      The kart starts at (15, 0) facing +Y (along bottom-to-top direction)
-      driving counterclockwise:
-        → right straight (+Y direction at x=15): blue=right=x>15, yellow=left=x<15
-        Actually let's define a simple oval:
-        - Center: (0,0)
-        - Semi-major axis (X): 20m
-        - Semi-minor axis (Y): 10m
-        - Track center follows the ellipse
-        - Blue cones on LEFT side (inside of CCW direction)
-        - Yellow cones on RIGHT side (outside)
-
-      For a CCW oval:
-        Right straight: y = -10 to +10, x = +20  → going in +Y direction
-        Left straight:  y = +10 to -10, x = -20  → going in -Y direction
-        Top curve: semicircle from (20,10) to (-20,10)
-        Bottom curve: semicircle from (-20,-10) to (20,-10)
-
-      Track half-width: 1.5m (3m wide track)
+      Small cone mesh half-height: 0.1517m (z-offset to sit on ground)
+      Big cone scaled half-height: 0.252m
     -->
 
     <!-- === RIGHT STRAIGHT (x=20, going +Y from -10 to +10) === -->
-    <!-- Blue cones (left side = inside = x=18.5) -->
-    <model name="blue_rs_0"><static>true</static><pose>18.5 -10 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>0.1 0.3 1.0 1</ambient><diffuse>0.1 0.3 1.0 1</diffuse></material></visual></link></model>
-    <model name="blue_rs_1"><static>true</static><pose>18.5 -5 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>0.1 0.3 1.0 1</ambient><diffuse>0.1 0.3 1.0 1</diffuse></material></visual></link></model>
-    <model name="blue_rs_2"><static>true</static><pose>18.5 0 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>0.1 0.3 1.0 1</ambient><diffuse>0.1 0.3 1.0 1</diffuse></material></visual></link></model>
-    <model name="blue_rs_3"><static>true</static><pose>18.5 5 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>0.1 0.3 1.0 1</ambient><diffuse>0.1 0.3 1.0 1</diffuse></material></visual></link></model>
-    <model name="blue_rs_4"><static>true</static><pose>18.5 10 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>0.1 0.3 1.0 1</ambient><diffuse>0.1 0.3 1.0 1</diffuse></material></visual></link></model>
+    <!-- Blue cones (left/inner side = x=18.5) -->
+    <include><uri>model://cone_blue</uri><name>blue_rs_0</name><pose>18.5 -10 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_rs_1</name><pose>18.5 -5 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_rs_2</name><pose>18.5 0 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_rs_3</name><pose>18.5 5 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_rs_4</name><pose>18.5 10 0.1517 0 0 0</pose></include>
 
-    <!-- Yellow cones (right side = outside = x=21.5) -->
-    <model name="yellow_rs_0"><static>true</static><pose>21.5 -10 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>1.0 0.9 0.1 1</ambient><diffuse>1.0 0.9 0.1 1</diffuse></material></visual></link></model>
-    <model name="yellow_rs_1"><static>true</static><pose>21.5 -5 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>1.0 0.9 0.1 1</ambient><diffuse>1.0 0.9 0.1 1</diffuse></material></visual></link></model>
-    <model name="yellow_rs_2"><static>true</static><pose>21.5 0 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>1.0 0.9 0.1 1</ambient><diffuse>1.0 0.9 0.1 1</diffuse></material></visual></link></model>
-    <model name="yellow_rs_3"><static>true</static><pose>21.5 5 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>1.0 0.9 0.1 1</ambient><diffuse>1.0 0.9 0.1 1</diffuse></material></visual></link></model>
-    <model name="yellow_rs_4"><static>true</static><pose>21.5 10 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>1.0 0.9 0.1 1</ambient><diffuse>1.0 0.9 0.1 1</diffuse></material></visual></link></model>
+    <!-- Yellow cones (right/outer side = x=21.5) -->
+    <include><uri>model://cone_yellow</uri><name>yellow_rs_0</name><pose>21.5 -10 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_rs_1</name><pose>21.5 -5 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_rs_2</name><pose>21.5 0 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_rs_3</name><pose>21.5 5 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_rs_4</name><pose>21.5 10 0.1517 0 0 0</pose></include>
 
     <!-- === LEFT STRAIGHT (x=-20, going -Y from +10 to -10) === -->
-    <!-- Blue cones (left side = inside = x=-18.5) -->
-    <model name="blue_ls_0"><static>true</static><pose>-18.5 10 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>0.1 0.3 1.0 1</ambient><diffuse>0.1 0.3 1.0 1</diffuse></material></visual></link></model>
-    <model name="blue_ls_1"><static>true</static><pose>-18.5 5 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>0.1 0.3 1.0 1</ambient><diffuse>0.1 0.3 1.0 1</diffuse></material></visual></link></model>
-    <model name="blue_ls_2"><static>true</static><pose>-18.5 0 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>0.1 0.3 1.0 1</ambient><diffuse>0.1 0.3 1.0 1</diffuse></material></visual></link></model>
-    <model name="blue_ls_3"><static>true</static><pose>-18.5 -5 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>0.1 0.3 1.0 1</ambient><diffuse>0.1 0.3 1.0 1</diffuse></material></visual></link></model>
-    <model name="blue_ls_4"><static>true</static><pose>-18.5 -10 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>0.1 0.3 1.0 1</ambient><diffuse>0.1 0.3 1.0 1</diffuse></material></visual></link></model>
+    <!-- Blue cones (left/inner side = x=-18.5) -->
+    <include><uri>model://cone_blue</uri><name>blue_ls_0</name><pose>-18.5 10 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_ls_1</name><pose>-18.5 5 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_ls_2</name><pose>-18.5 0 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_ls_3</name><pose>-18.5 -5 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_ls_4</name><pose>-18.5 -10 0.1517 0 0 0</pose></include>
 
-    <!-- Yellow cones (right side = outside = x=-21.5) -->
-    <model name="yellow_ls_0"><static>true</static><pose>-21.5 10 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>1.0 0.9 0.1 1</ambient><diffuse>1.0 0.9 0.1 1</diffuse></material></visual></link></model>
-    <model name="yellow_ls_1"><static>true</static><pose>-21.5 5 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>1.0 0.9 0.1 1</ambient><diffuse>1.0 0.9 0.1 1</diffuse></material></visual></link></model>
-    <model name="yellow_ls_2"><static>true</static><pose>-21.5 0 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>1.0 0.9 0.1 1</ambient><diffuse>1.0 0.9 0.1 1</diffuse></material></visual></link></model>
-    <model name="yellow_ls_3"><static>true</static><pose>-21.5 -5 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>1.0 0.9 0.1 1</ambient><diffuse>1.0 0.9 0.1 1</diffuse></material></visual></link></model>
-    <model name="yellow_ls_4"><static>true</static><pose>-21.5 -10 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>1.0 0.9 0.1 1</ambient><diffuse>1.0 0.9 0.1 1</diffuse></material></visual></link></model>
+    <!-- Yellow cones (right/outer side = x=-21.5) -->
+    <include><uri>model://cone_yellow</uri><name>yellow_ls_0</name><pose>-21.5 10 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_ls_1</name><pose>-21.5 5 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_ls_2</name><pose>-21.5 0 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_ls_3</name><pose>-21.5 -5 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_ls_4</name><pose>-21.5 -10 0.1517 0 0 0</pose></include>
 
-    <!-- === TOP CURVE (semicircle from x=20,y=10 to x=-20,y=10, center at 0,10) === -->
-    <!-- Going CCW: blue=inside (smaller radius=18.5), yellow=outside (radius=21.5) -->
-    <!-- 7 cones per side, angles from 0 to pi (right to left) -->
-    <!-- angle 0: (20,10), pi/6: (17.3,15.25), pi/3: (10,19), pi/2: (0,20), etc. -->
+    <!-- === TOP CURVE (semicircle center at 0,10, right to left) === -->
+    <!-- Blue inner curve (radius 18.5) -->
+    <include><uri>model://cone_blue</uri><name>blue_tc_0</name><pose>16.02 14.25 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_tc_1</name><pose>9.25 18.02 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_tc_2</name><pose>0 20 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_tc_3</name><pose>-9.25 18.02 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_tc_4</name><pose>-16.02 14.25 0.1517 0 0 0</pose></include>
 
-    <!-- Blue inner curve (radius 18.5 from center 0,10) -->
-    <model name="blue_tc_0"><static>true</static><pose>16.02 14.25 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>0.1 0.3 1.0 1</ambient><diffuse>0.1 0.3 1.0 1</diffuse></material></visual></link></model>
-    <model name="blue_tc_1"><static>true</static><pose>9.25 18.02 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>0.1 0.3 1.0 1</ambient><diffuse>0.1 0.3 1.0 1</diffuse></material></visual></link></model>
-    <model name="blue_tc_2"><static>true</static><pose>0 20 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>0.1 0.3 1.0 1</ambient><diffuse>0.1 0.3 1.0 1</diffuse></material></visual></link></model>
-    <model name="blue_tc_3"><static>true</static><pose>-9.25 18.02 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>0.1 0.3 1.0 1</ambient><diffuse>0.1 0.3 1.0 1</diffuse></material></visual></link></model>
-    <model name="blue_tc_4"><static>true</static><pose>-16.02 14.25 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>0.1 0.3 1.0 1</ambient><diffuse>0.1 0.3 1.0 1</diffuse></material></visual></link></model>
+    <!-- Yellow outer curve (radius 21.5) -->
+    <include><uri>model://cone_yellow</uri><name>yellow_tc_0</name><pose>18.62 16.75 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_tc_1</name><pose>10.75 20.62 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_tc_2</name><pose>0 23 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_tc_3</name><pose>-10.75 20.62 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_tc_4</name><pose>-18.62 16.75 0.1517 0 0 0</pose></include>
 
-    <!-- Yellow outer curve (radius 21.5 from center 0,10) -->
-    <model name="yellow_tc_0"><static>true</static><pose>18.62 16.75 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>1.0 0.9 0.1 1</ambient><diffuse>1.0 0.9 0.1 1</diffuse></material></visual></link></model>
-    <model name="yellow_tc_1"><static>true</static><pose>10.75 20.62 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>1.0 0.9 0.1 1</ambient><diffuse>1.0 0.9 0.1 1</diffuse></material></visual></link></model>
-    <model name="yellow_tc_2"><static>true</static><pose>0 23 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>1.0 0.9 0.1 1</ambient><diffuse>1.0 0.9 0.1 1</diffuse></material></visual></link></model>
-    <model name="yellow_tc_3"><static>true</static><pose>-10.75 20.62 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>1.0 0.9 0.1 1</ambient><diffuse>1.0 0.9 0.1 1</diffuse></material></visual></link></model>
-    <model name="yellow_tc_4"><static>true</static><pose>-18.62 16.75 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>1.0 0.9 0.1 1</ambient><diffuse>1.0 0.9 0.1 1</diffuse></material></visual></link></model>
+    <!-- === BOTTOM CURVE (semicircle center at 0,-10, left to right) === -->
+    <!-- Blue inner curve (radius 18.5) -->
+    <include><uri>model://cone_blue</uri><name>blue_bc_0</name><pose>-16.02 -14.25 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_bc_1</name><pose>-9.25 -18.02 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_bc_2</name><pose>0 -20 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_bc_3</name><pose>9.25 -18.02 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_bc_4</name><pose>16.02 -14.25 0.1517 0 0 0</pose></include>
 
-    <!-- === BOTTOM CURVE (semicircle from x=-20,y=-10 to x=20,y=-10, center at 0,-10) === -->
-    <!-- Going CCW: blue=inside (radius 18.5), yellow=outside (radius 21.5) -->
+    <!-- Yellow outer curve (radius 21.5) -->
+    <include><uri>model://cone_yellow</uri><name>yellow_bc_0</name><pose>-18.62 -16.75 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_bc_1</name><pose>-10.75 -20.62 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_bc_2</name><pose>0 -23 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_bc_3</name><pose>10.75 -20.62 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_bc_4</name><pose>18.62 -16.75 0.1517 0 0 0</pose></include>
 
-    <!-- Blue inner curve (radius 18.5 from center 0,-10) -->
-    <model name="blue_bc_0"><static>true</static><pose>-16.02 -14.25 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>0.1 0.3 1.0 1</ambient><diffuse>0.1 0.3 1.0 1</diffuse></material></visual></link></model>
-    <model name="blue_bc_1"><static>true</static><pose>-9.25 -18.02 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>0.1 0.3 1.0 1</ambient><diffuse>0.1 0.3 1.0 1</diffuse></material></visual></link></model>
-    <model name="blue_bc_2"><static>true</static><pose>0 -20 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>0.1 0.3 1.0 1</ambient><diffuse>0.1 0.3 1.0 1</diffuse></material></visual></link></model>
-    <model name="blue_bc_3"><static>true</static><pose>9.25 -18.02 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>0.1 0.3 1.0 1</ambient><diffuse>0.1 0.3 1.0 1</diffuse></material></visual></link></model>
-    <model name="blue_bc_4"><static>true</static><pose>16.02 -14.25 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>0.1 0.3 1.0 1</ambient><diffuse>0.1 0.3 1.0 1</diffuse></material></visual></link></model>
-
-    <!-- Yellow outer curve (radius 21.5 from center 0,-10) -->
-    <model name="yellow_bc_0"><static>true</static><pose>-18.62 -16.75 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>1.0 0.9 0.1 1</ambient><diffuse>1.0 0.9 0.1 1</diffuse></material></visual></link></model>
-    <model name="yellow_bc_1"><static>true</static><pose>-10.75 -20.62 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>1.0 0.9 0.1 1</ambient><diffuse>1.0 0.9 0.1 1</diffuse></material></visual></link></model>
-    <model name="yellow_bc_2"><static>true</static><pose>0 -23 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>1.0 0.9 0.1 1</ambient><diffuse>1.0 0.9 0.1 1</diffuse></material></visual></link></model>
-    <model name="yellow_bc_3"><static>true</static><pose>10.75 -20.62 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>1.0 0.9 0.1 1</ambient><diffuse>1.0 0.9 0.1 1</diffuse></material></visual></link></model>
-    <model name="yellow_bc_4"><static>true</static><pose>18.62 -16.75 0.1625 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.325</length></cylinder></geometry><material><ambient>1.0 0.9 0.1 1</ambient><diffuse>1.0 0.9 0.1 1</diffuse></material></visual></link></model>
-
-    <!-- === ORANGE CONES at start/finish (right straight, y=0) === -->
-    <model name="orange_sf_0"><static>true</static><pose>18.0 -0.5 0.2525 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.505</length></cylinder></geometry><material><ambient>1.0 0.5 0.1 1</ambient><diffuse>1.0 0.5 0.1 1</diffuse></material></visual></link></model>
-    <model name="orange_sf_1"><static>true</static><pose>18.0 0.5 0.2525 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.505</length></cylinder></geometry><material><ambient>1.0 0.5 0.1 1</ambient><diffuse>1.0 0.5 0.1 1</diffuse></material></visual></link></model>
-    <model name="orange_sf_2"><static>true</static><pose>22.0 -0.5 0.2525 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.505</length></cylinder></geometry><material><ambient>1.0 0.5 0.1 1</ambient><diffuse>1.0 0.5 0.1 1</diffuse></material></visual></link></model>
-    <model name="orange_sf_3"><static>true</static><pose>22.0 0.5 0.2525 0 0 0</pose><link name="link"><visual name="v"><geometry><cylinder><radius>0.114</radius><length>0.505</length></cylinder></geometry><material><ambient>1.0 0.5 0.1 1</ambient><diffuse>1.0 0.5 0.1 1</diffuse></material></visual></link></model>
+    <!-- === ORANGE BIG CONES at start/finish (right straight, y≈0) === -->
+    <include><uri>model://cone_orange_big</uri><name>orange_sf_0</name><pose>18.0 -0.5 0.252 0 0 0</pose></include>
+    <include><uri>model://cone_orange_big</uri><name>orange_sf_1</name><pose>18.0 0.5 0.252 0 0 0</pose></include>
+    <include><uri>model://cone_orange_big</uri><name>orange_sf_2</name><pose>22.0 -0.5 0.252 0 0 0</pose></include>
+    <include><uri>model://cone_orange_big</uri><name>orange_sf_3</name><pose>22.0 0.5 0.252 0 0 0</pose></include>
 
   </world>
 </sdf>

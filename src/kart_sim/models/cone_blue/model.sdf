@@ -5,16 +5,10 @@
     <link name="link">
       <visual name="visual">
         <geometry>
-          <cylinder>
-            <radius>0.114</radius>
-            <length>0.325</length>
-          </cylinder>
+          <mesh>
+            <uri>model://cone_blue/meshes/cone_blue.dae</uri>
+          </mesh>
         </geometry>
-        <material>
-          <ambient>0.1 0.3 1.0 1</ambient>
-          <diffuse>0.1 0.3 1.0 1</diffuse>
-          <specular>0.2 0.2 0.2 1</specular>
-        </material>
       </visual>
       <collision name="collision">
         <geometry>
