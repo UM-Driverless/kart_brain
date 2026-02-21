@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""Simple midpoint-follower controller for the kart.
+"""PID cone-following controller for the kart.
 
-Subscribes to 3D cone detections, separates blue (left) and yellow (right),
-finds the nearest pair, steers toward the midpoint with proportional control.
+Finds the closest blue (left) and yellow (right) cones in front,
+computes the average Y offset as the error signal, and applies
+PID control to steer the kart back to center.
+
+Long-term goal: replace with a neural net trained via imitation learning.
 """
 import math
 
@@ -18,28 +21,33 @@ class ConeFollowerNode(Node):
 
         self.declare_parameter("detections_topic", "/perception/cones_3d")
         self.declare_parameter("cmd_vel_topic", "/kart/cmd_vel")
-        self.declare_parameter("max_speed", 2.0)
-        self.declare_parameter("min_speed", 0.5)
-        self.declare_parameter("steering_gain", 1.5)
-        self.declare_parameter("speed_curvature_gain", 2.0)
-        self.declare_parameter("lookahead_min", 2.0)
+        self.declare_parameter("speed", 2.0)
         self.declare_parameter("lookahead_max", 10.0)
         self.declare_parameter("no_cone_timeout", 1.0)
+        # PID gains (error = avg_y in meters, output = steering in degrees)
+        self.declare_parameter("kp", 0.2)
+        self.declare_parameter("ki", 0.0)
+        self.declare_parameter("kd", 0.15)
 
         det_topic = str(self.get_parameter("detections_topic").value)
         cmd_topic = str(self.get_parameter("cmd_vel_topic").value)
-        self.max_speed = float(self.get_parameter("max_speed").value)
-        self.min_speed = float(self.get_parameter("min_speed").value)
-        self.steering_gain = float(self.get_parameter("steering_gain").value)
-        self.speed_curv_gain = float(self.get_parameter("speed_curvature_gain").value)
-        self.lookahead_min = float(self.get_parameter("lookahead_min").value)
+        self.speed = float(self.get_parameter("speed").value)
         self.lookahead_max = float(self.get_parameter("lookahead_max").value)
         self.no_cone_timeout = float(self.get_parameter("no_cone_timeout").value)
+        self.kp = float(self.get_parameter("kp").value)
+        self.ki = float(self.get_parameter("ki").value)
+        self.kd = float(self.get_parameter("kd").value)
 
         self.cmd_pub = self.create_publisher(Twist, cmd_topic, 10)
         self.sub = self.create_subscription(
             Detection3DArray, det_topic, self._on_detections, 10
         )
+
+        # PID state
+        self._integral = 0.0
+        self._prev_error = 0.0
+        self._last_time = None
+        self._last_steer = 0.0
 
         self.last_detection_time = self.get_clock().now()
         self.timer = self.create_timer(0.1, self._safety_check)
@@ -47,15 +55,17 @@ class ConeFollowerNode(Node):
     def _on_detections(self, msg: Detection3DArray):
         self.last_detection_time = self.get_clock().now()
 
-        blue_cones = []
-        yellow_cones = []
+        nearest_blue = None
+        nearest_yellow = None
+        min_blue_dist = float('inf')
+        min_yellow_dist = float('inf')
 
         for det in msg.detections:
             if not det.results:
                 continue
             class_id = det.results[0].hypothesis.class_id
             pos = det.results[0].pose.pose.position
-            # Only consider cones in front of the camera (x > 0)
+
             if pos.x <= 0.5:
                 continue
 
@@ -63,84 +73,66 @@ class ConeFollowerNode(Node):
             if dist > self.lookahead_max:
                 continue
 
-            if class_id == "blue_cone":
-                blue_cones.append((pos.x, pos.y, dist))
-            elif class_id == "yellow_cone":
-                yellow_cones.append((pos.x, pos.y, dist))
-            # Orange cones treated as both sides at start/finish
+            if class_id == "blue_cone" and dist < min_blue_dist:
+                min_blue_dist = dist
+                nearest_blue = pos
+            elif class_id == "yellow_cone" and dist < min_yellow_dist:
+                min_yellow_dist = dist
+                nearest_yellow = pos
+
+        # Compute error (Y offset from track center, in meters)
+        error = None
+        if nearest_blue and nearest_yellow:
+            error = (nearest_blue.y + nearest_yellow.y) / 2.0
+        elif nearest_blue:
+            error = nearest_blue.y - 1.5
+        elif nearest_yellow:
+            error = nearest_yellow.y + 1.5
 
         cmd = Twist()
+        cmd.linear.x = self.speed
 
-        if not blue_cones and not yellow_cones:
-            # No cones visible — keep creeping forward with last steering
-            cmd.linear.x = self.min_speed
-            cmd.angular.z = getattr(self, '_last_steer', 0.0)
-            self.cmd_pub.publish(cmd)
-            return
+        if error is not None:
+            # PID
+            now = self.get_clock().now()
+            if self._last_time is not None:
+                dt = (now - self._last_time).nanoseconds / 1e9
+                dt = max(dt, 0.001)  # avoid division by zero
+            else:
+                dt = 0.1
 
-        # Find target point: midpoint between nearest blue and yellow
-        target_x = 0.0
-        target_y = 0.0
-        has_target = False
+            self._integral += error * dt
+            # Anti-windup: clamp integral
+            self._integral = max(-5.0, min(5.0, self._integral))
 
-        if blue_cones and yellow_cones:
-            # Sort by distance, pick nearest of each
-            blue_cones.sort(key=lambda c: c[2])
-            yellow_cones.sort(key=lambda c: c[2])
+            derivative = (error - self._prev_error) / dt
 
-            # Use the nearest pair within lookahead range
-            bx, by, _ = blue_cones[0]
-            yx, yy, _ = yellow_cones[0]
-            target_x = (bx + yx) / 2.0
-            target_y = (by + yy) / 2.0
-            has_target = True
-        elif blue_cones:
-            # Only blue (left boundary) visible — steer right of them
-            blue_cones.sort(key=lambda c: c[2])
-            bx, by, _ = blue_cones[0]
-            target_x = bx
-            target_y = by - 1.5  # Offset to the right
-            has_target = True
-        elif yellow_cones:
-            # Only yellow (right boundary) visible — steer left of them
-            yellow_cones.sort(key=lambda c: c[2])
-            yx, yy, _ = yellow_cones[0]
-            target_x = yx
-            target_y = yy + 1.5  # Offset to the left
-            has_target = True
+            steer = self.kp * error + self.ki * self._integral + self.kd * derivative
+            # Clamp to max steering (0.5 rad ≈ 29 deg)
+            steer = max(-0.5, min(0.5, steer))
+            cmd.angular.z = steer
 
-        if not has_target or target_x < 0.5:
-            cmd.linear.x = self.min_speed
-            self.cmd_pub.publish(cmd)
-            return
+            self._prev_error = error
+            self._last_time = now
+            self._last_steer = cmd.angular.z
 
-        # Proportional steering: angle to target
-        angle_to_target = math.atan2(target_y, target_x)
-        steer = self.steering_gain * angle_to_target
+            self.get_logger().info(
+                f"err={error:.2f}m steer={math.degrees(steer):.1f}deg "
+                f"P={self.kp*error:.1f} I={self.ki*self._integral:.2f} D={self.kd*derivative:.1f} "
+                f"blue={'%.1f'%nearest_blue.y if nearest_blue else '-'} "
+                f"yellow={'%.1f'%nearest_yellow.y if nearest_yellow else '-'}"
+            )
+        else:
+            cmd.angular.z = self._last_steer
 
-        # Speed: inversely proportional to curvature
-        curvature = abs(angle_to_target)
-        speed = self.max_speed - self.speed_curv_gain * curvature
-        speed = max(self.min_speed, min(self.max_speed, speed))
-
-        cmd.linear.x = speed
-        cmd.angular.z = steer
-        self._last_steer = steer
         self.cmd_pub.publish(cmd)
 
-        self.get_logger().debug(
-            f"target=({target_x:.1f},{target_y:.1f}) "
-            f"steer={steer:.2f} speed={speed:.2f} "
-            f"blue={len(blue_cones)} yellow={len(yellow_cones)}"
-        )
-
     def _safety_check(self):
-        """Stop the kart if no detections received for too long."""
         elapsed = (self.get_clock().now() - self.last_detection_time).nanoseconds / 1e9
         if elapsed > self.no_cone_timeout:
             cmd = Twist()
-            cmd.linear.x = self.min_speed
-            cmd.angular.z = getattr(self, '_last_steer', 0.0)
+            cmd.linear.x = self.speed
+            cmd.angular.z = self._last_steer
             self.cmd_pub.publish(cmd)
 
 
