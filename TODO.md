@@ -1,6 +1,6 @@
 # TODO
 
-## Kart Still Oversteers with YOLO Pipeline
+## Kart Still Oversteers with YOLO Pipeline (Simulation)
 
 **Status:** CameraInfo intrinsics fixed, midpoint-angle steering implemented, but kart still doesn't drive properly.
 
@@ -23,6 +23,38 @@
 3. Verify depth image quality — cone forward distances seem short (~1-3m for cones that should be ~5m away), which could be a depth image issue separate from CameraInfo
 4. Consider adding a ramp-up delay or pausing Gazebo until all nodes are ready
 
-## Long-Term Tasks
+## Install Gazebo Simulation on Orin
 
-- Explore YOLO acceleration via ONNX/TensorRT on Jetson (C++ node optional).
+**Status:** Blocked — needs NVMe root migration first (currently only 5 GB free on eMMC root)
+
+**What's needed:**
+```bash
+sudo apt install ros-humble-ros-gz  # ~3-4 GB with all dependencies
+```
+
+**Prerequisites:**
+- Migrate root filesystem to NVMe (476 GB available at `/mnt/data`). This requires a host PC to reflash the initrd. See `.agents/orin_environment.md`.
+- Alternatively, install Gazebo libs to `/mnt/data` with symlinks (hacky, not recommended)
+
+**Once installed:**
+- All simulation code is already in `src/kart_sim/` (worlds, models, launch files)
+- See `.agents/simulation.md` for how to run
+- The sim was developed and tested in a UTM VM (see `.agents/vm_environment.md`)
+
+## ESP32 Communication
+
+**Status:** Not started on Orin
+
+**What's needed:**
+1. Explore `src/kb_coms_micro/` package (ROS2 serial comms to ESP32)
+2. Check `kart_medulla` firmware at `~/Desktop/kart_medulla` (ESP32, PlatformIO)
+3. Understand actuation protocol — see `docs/ACTUATION_PROTOCOL.md`
+4. Wire ESP32 via USB serial (`/dev/ttyTHS1` or USB)
+5. Test sending steering + throttle commands via ROS2 topics
+
+## Long-Term
+
+- Explore YOLO acceleration via ONNX/TensorRT on Jetson
+- Set up ZED ROS2 wrapper for proper depth + 3D cone localization (instead of webcam mode)
+- Trajectory planning from cone positions
+- Full autonomous loop: camera → detection → planning → actuation

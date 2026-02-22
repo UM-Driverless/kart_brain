@@ -179,3 +179,17 @@ pkill -9 ign; pkill -f parameter_bridge; pkill -f perfect_perception; pkill -f c
 | Camera resolution | 640 x 360 @ 10 Hz | RGBD |
 | Max speed | 5 m/s | Ackermann plugin limit |
 | Max steering | 0.5 rad (~29 deg) | |
+
+## Installing on Jetson Orin
+
+**Status:** Not yet installed. Blocked by root filesystem space (~5 GB free on eMMC).
+
+Once root is migrated to NVMe, install with:
+```bash
+echo '0' | sudo -S apt install -y ros-humble-ros-gz
+```
+
+Everything else (worlds, models, launch files) is already in `src/kart_sim/`.
+Set `IGN_GAZEBO_RESOURCE_PATH` and launch as documented above.
+
+The Orin's Ampere GPU should handle Gazebo rendering natively (unlike the VM which uses llvmpipe), so higher resolutions and real-time factors >1 should be possible.

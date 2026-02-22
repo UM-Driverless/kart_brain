@@ -64,3 +64,10 @@ Used everywhere — YOLO class names, Detection messages, visualization:
 3. Build and verify before committing
 4. If a mistake occurred, document it in `.agents/error_log.md`
 5. If recurring, create a postmortem in `.agents/postmortems/`
+
+## Documentation
+The official documentation for the kart project lives in a separate repo:
+- **Repo:** https://github.com/UM-Driverless/kart_docs
+- **Site:** https://um-driverless.github.io/kart_docs/
+
+The `.agents/` directory in this repo is for AI agent workflow only — not official project docs.
