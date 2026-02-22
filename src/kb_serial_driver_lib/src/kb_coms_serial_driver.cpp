@@ -247,35 +247,20 @@ void SerialDriver::rx_loop()
 
     while (running_ && fd_ >= 0)
     {
-        uint16_t n = read(fd_, buffer + bytes_in_buffer, sizeof(buffer) - bytes_in_buffer);
+        ssize_t n = read(fd_, buffer + bytes_in_buffer, sizeof(buffer) - bytes_in_buffer);
 
-        if (n <= 0) {
-            std::cerr << "Error durante lectura" << std::endl;
+        if (n < 0) {
             close_port();
             return;
         }
-        bytes_in_buffer += n;
+        if (n == 0) continue;
 
-        uint16_t processed = 0; // Contador de bytes procesados
+        bytes_in_buffer += static_cast<uint16_t>(n);
 
-        for (uint16_t i = 0; i < n; ++i){
-            std::cerr << "El bytes es: " << buffer[i] << "y ocupa el lugar " << i << std::endl;
-            if(process_byte(buffer[i])) {
-                processed++;
-                break;
-            }
+        for (uint16_t i = 0; i < bytes_in_buffer; ++i)
+            process_byte(buffer[i]);
 
-            processed++;
-        }
-
-        // Mover los bytes no procesados al principio del buffer
-        if (processed < bytes_in_buffer) {
-            memmove(buffer, buffer + processed, bytes_in_buffer - processed);
-            bytes_in_buffer -= processed;
-
-        } else {
-            bytes_in_buffer = 0;
-        }
+        bytes_in_buffer = 0;
     }
 }
 
@@ -347,18 +332,6 @@ int SerialDriver::process_byte(uint8_t byte)
     //     state_ = State::WAIT_SOF;
     // }
 
-    if (state_ == State::WAIT_SOF)
-        std::cerr << "WAIT_SOF" << std::endl;
-    else if (state_ == State::LEN)
-        std::cerr << "WAIT_LEN" << std::endl;
-    else if (state_ == State::TYPE)
-        std::cerr << "WAIT_TYPE" << std::endl;
-    else if (state_ == State::PAYLOAD)
-        std::cerr << "WAIT_PAYLOAD" << std::endl;
-    else if (state_ == State::CRC)
-        std::cerr << "WAIT_CRC" << std::endl;
-    
-
     switch (state_)
     {
         case State::WAIT_SOF:
@@ -401,7 +374,6 @@ int SerialDriver::process_byte(uint8_t byte)
                 frame.payload.assign(payload_.begin(),
                      payload_.begin() + len_);
                 rx_ok_++;
-                std::cout << "Mensaje recibido correctamente, llamando a callback de nodo ros" << std::endl;
                 callback_(frame);
 
                 // End of msg
