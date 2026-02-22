@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(msgs_to_micro)
+project(kb_coms_micro)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
@@ -9,33 +9,37 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(ackermann_msgs REQUIRED)
+find_package(kb_interfaces REQUIRED)
+
+# Buscar la librería externa
+add_subdirectory(../kb_serial_driver_lib build_serial)
 
 set(dependencies
   rclcpp
   std_msgs
-  ackermann_msgs
+  kb_interfaces
 )
 include_directories(include)
+include_directories(../kb_serial_driver_lib/include)
 
 add_library(${PROJECT_NAME} SHARED
-  src/msgs_to_micro/comms_micro.cpp
-
+  src/kb_coms_micro/kb_coms_micro.cpp
 )
 ament_target_dependencies(${PROJECT_NAME} ${dependencies})
 
-add_executable(comms_micro src/main_comms.cpp)
-ament_target_dependencies(comms_micro ${dependencies})
-target_link_libraries(comms_micro ${PROJECT_NAME})
+add_executable(KB_Coms_micro src/kb_coms_main.cpp)
+ament_target_dependencies(KB_Coms_micro ${dependencies})
+target_link_libraries(KB_Coms_micro ${PROJECT_NAME} serial_driver)
 
 install(TARGETS
   ${PROJECT_NAME}
-  comms_micro
+  KB_Coms_micro
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
+# Agregar launch si se quiere poner launcher en este paquete
 install(DIRECTORY DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)
