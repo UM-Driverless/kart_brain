@@ -74,3 +74,24 @@ Tracks mistakes made during development and the prevention mechanisms added. Eve
 **What happened:** Tried to SSH into the y540 laptop but got "Connection refused" — openssh-server was not installed. Cannot install it remotely without SSH access.
 **Prevention added:**
 - Rule: When setting up a new machine for remote access, the **first step is always installing openssh-server** on it physically: `sudo apt install -y openssh-server`
+
+## 2026-02-22 - ZED SDK installer breaks pip permissions
+**What happened:** The ZED SDK installer runs pip as root to install `pyzed`, `numpy`, and `cython` into `/usr/local/lib/python3.10/dist-packages/`. This leaves `.dist-info` directories owned by root with no world-read permission. Subsequent `pip3 install` by the normal user fails with `PermissionError: [Errno 13] Permission denied: '/usr/local/lib/python3.10/dist-packages/pyzed-4.2.dist-info'`.
+**Prevention added:**
+- After installing ZED SDK, always run: `sudo chmod -R a+rX /usr/local/lib/python3.10/dist-packages/`
+- Rule: When any installer runs pip as root (sudo), check permissions on dist-packages afterward.
+
+## 2026-02-22 - PyTorch installed as CPU-only (Jetson AI Lab index unreachable)
+**What happened:** `pip3 install --extra-index-url https://pypi.jetson-ai-lab.dev/jp6/cu126 torch torchvision` was run, but the Jetson AI Lab index didn't resolve (DNS failure: `Name or service not known`). Pip silently fell back to PyPI and installed the standard `torch 2.10.0+cpu` wheel (no CUDA). Also pulled `numpy 2.2.6`, breaking `pyzed` and `cv2`.
+**Prevention added:**
+- Rule: After installing PyTorch, **always verify CUDA is available**: `python3 -c "import torch; print(torch.version.cuda, torch.cuda.is_available())"`
+- Rule: After any `--force-reinstall` of torch, **immediately pin numpy**: `pip3 install 'numpy<2'`
+- Rule: Check the extra-index-url is reachable before relying on it: `curl -sI https://pypi.jetson-ai-lab.dev/`
+- Added to TODO.md as a blocked task
+
+## 2026-02-22 - AnyDesk black screen without ConnectedMonitor Xorg option
+**What happened:** AnyDesk showed a black framebuffer. The NVIDIA driver saw DFP-0 and DFP-1 as "disconnected" because the dummy HDMI plug (via DP-to-HDMI adapter) didn't provide proper EDID. Without a connected monitor, Xorg had no screen.
+**Prevention added:**
+- Created `/etc/X11/xorg.conf.d/10-virtual-display.conf` with `Option "ConnectedMonitor" "DFP-0"` to force the driver to create a framebuffer on DisplayPort regardless of EDID detection
+- Also set `Option "AllowEmptyInitialConfiguration" "true"` and `Virtual 1920 1080`
+- Documented in kart_docs orin-setup.md

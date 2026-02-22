@@ -23,18 +23,33 @@
 3. Verify depth image quality — cone forward distances seem short (~1-3m for cones that should be ~5m away), which could be a depth image issue separate from CameraInfo
 4. Consider adding a ramp-up delay or pausing Gazebo until all nodes are ready
 
+## Fix PyTorch CUDA Support on Orin
+
+**Status:** Blocked — Jetson AI Lab wheel index (`pypi.jetson-ai-lab.dev`) is unreachable (DNS doesn't resolve from either Orin or Mac as of 2026-02-22).
+
+**Problem:** PyTorch installed as `torch 2.10.0+cpu` (CPU-only) because pip fell back to PyPI when the Jetson-specific index was down. `torch.cuda.is_available()` returns `False`.
+
+**What's needed:**
+1. Wait for `pypi.jetson-ai-lab.dev` to come back online, then:
+   ```bash
+   pip3 install --no-cache-dir --force-reinstall \
+     --extra-index-url https://pypi.jetson-ai-lab.dev/jp6/cu126 \
+     torch torchvision
+   pip3 install --no-cache-dir 'numpy<2'  # force-reinstall may pull numpy>=2
+   ```
+2. Verify: `python3 -c "import torch; print(torch.cuda.is_available())"` → `True`
+3. If the index stays down, look for alternative Jetson PyTorch wheels at https://developer.download.nvidia.com/compute/redist/jp/ or build from source
+
+**Important:** Always pin `numpy<2` after any torch reinstall — torch's dependencies may pull numpy 2.x which breaks `cv2` and `pyzed`.
+
 ## Install Gazebo Simulation on Orin
 
-**Status:** Blocked — needs NVMe root migration first (currently only 5 GB free on eMMC root)
+**Status:** Ready — NVMe is now root with 419 GB free.
 
 **What's needed:**
 ```bash
 sudo apt install ros-humble-ros-gz  # ~3-4 GB with all dependencies
 ```
-
-**Prerequisites:**
-- Migrate root filesystem to NVMe (476 GB available at `/mnt/data`). This requires a host PC to reflash the initrd. See `.agents/orin_environment.md`.
-- Alternatively, install Gazebo libs to `/mnt/data` with symlinks (hacky, not recommended)
 
 **Once installed:**
 - All simulation code is already in `src/kart_sim/` (worlds, models, launch files)

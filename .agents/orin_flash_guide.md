@@ -146,11 +146,11 @@ ssh orin "bash /tmp/jetson-orin-setup.sh"
 ```
 
 The script installs (in order):
-1. **nvidia-jetpack** — CUDA 12.6, cuDNN, TensorRT
+1. **nvidia-jetpack** — CUDA 12.6, cuDNN 9.3, TensorRT 10.3
 2. **ROS 2 Humble** — full desktop + vision_msgs + dev tools
-3. **ZED SDK 5.2** — for ZED 2 stereo camera
-4. **PyTorch 2.5** — from NVIDIA's Jetson AI Lab wheels
-5. **Python deps** — numpy <2, ultralytics, etc.
+3. **ZED SDK 4.2** — for ZED 2 stereo camera (L4T 36.4 build, compatible with 36.5)
+4. **PyTorch 2.10** — from NVIDIA's Jetson AI Lab wheels (jp6/cu126)
+5. **Python deps** — numpy <2, ultralytics 8.4.14, etc.
 6. **kart_brain** — clone, build with colcon
 
 ### Verify
@@ -158,7 +158,7 @@ The script installs (in order):
 nvcc --version                    # CUDA
 python3 -c "import torch; print(torch.cuda.is_available())"  # PyTorch GPU
 ros2 --help                       # ROS 2
-/mnt/data/kart_brain/run_live.sh  # Live perception
+~/kart_brain/run_live.sh          # Live perception
 ```
 
 ## Post-Setup Checklist
@@ -205,3 +205,9 @@ JetPack 7.0/7.1 only supports Jetson Thor, NOT AGX Orin. Orin support comes in J
 
 ### Why command-line flash and not SDK Manager? (2026-02-22)
 SDK Manager has issues on Ubuntu 24.04 (the y540's OS). The command-line L4T tools (`l4t_initrd_flash.sh`) are what SDK Manager uses under the hood anyway, and they work reliably on Ubuntu 24.04 for flashing. We can drive the entire process over SSH.
+
+### Why ZED SDK 4.2 and not 5.2? (2026-02-22)
+ZED SDK 5.2 does not provide a build for L4T 36.5 (JetPack 6.2.2). The download URL pattern `https://download.stereolabs.com/zedsdk/5.2/l4t36.5/jetsons` returns an HTML page instead of a binary. ZED SDK 4.2 for L4T 36.4 installs successfully on L4T 36.5 — the installer warns `Detected Tegra_L4T36.5, required exact Tegra_L4T36.4` but proceeds and works. When SDK 5.2 for L4T 36.5 becomes available, upgrade.
+
+### Why PyTorch 2.10 from Jetson AI Lab? (2026-02-22)
+Standard PyPI torch wheels don't support Jetson (aarch64 + CUDA). NVIDIA's Jetson AI Lab provides pre-built wheels at `https://pypi.jetson-ai-lab.dev/jp6/cu126`. The `torch==2.10.0` version installed is compatible with JetPack 6.2.2 / CUDA 12.6. Install with: `pip3 install --extra-index-url https://pypi.jetson-ai-lab.dev/jp6/cu126 torch torchvision`

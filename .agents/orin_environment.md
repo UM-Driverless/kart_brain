@@ -8,7 +8,7 @@
 | RAM | 62 GB |
 | CPUs | 12 cores |
 | GPU | Ampere (CUDA 12.6) |
-| Storage | 57 GB eMMC (root) + 476 GB NVMe SSD at `/mnt/data` |
+| Storage | 476 GB NVMe SSD (root filesystem) + 57 GB eMMC (bootloader only) |
 | Display | DisplayPort only (no HDMI). DP-to-HDMI adapter + dummy plug for AnyDesk |
 | Camera | ZED 2 stereo (USB, SN 21983349) |
 | CAN bus | `can0`, `can1` interfaces (for ESP32 comms) |
@@ -29,13 +29,17 @@ ssh orin 'echo "0" | sudo -S <command>'
 ## Software
 | Software | Version / Path |
 |---|---|
-| OS | Ubuntu 22.04 (L4T R36.4, JetPack 6) |
-| ROS 2 | Humble (`/opt/ros/humble/setup.bash`) |
-| CUDA | 12.6 (`/usr/local/cuda-12.6/`) |
-| PyTorch | 2.5.0a0+872d972e41.nv24.08 (Jetson build) |
-| ZED SDK | 4.2.5 (`/usr/local/zed/`) |
+| OS | Ubuntu 22.04 (L4T R36.5, JetPack 6.2.2) |
+| ROS 2 | Humble (full desktop + vision_msgs + dev tools) |
+| CUDA | 12.6 (via nvidia-jetpack) |
+| cuDNN | 9.3 (via nvidia-jetpack) |
+| TensorRT | 10.3 (via nvidia-jetpack) |
+| PyTorch | 2.10.0+cpu (**CPU-only** — Jetson AI Lab index was down, see TODO.md) |
+| ZED SDK | 4.2 (`/usr/local/zed/`, L4T 36.4 build, compatible with L4T 36.5) |
 | Python | 3.10.12 (system) |
-| numpy | Must be <2 (cv2 compiled against numpy 1.x) |
+| numpy | 1.26.4 (must be <2, cv2 compiled against numpy 1.x) |
+| ultralytics | 8.4.14 |
+| AnyDesk | Installed |
 
 ## Environment Setup
 ```bash
@@ -43,15 +47,14 @@ ssh orin 'echo "0" | sudo -S <command>'
 export LD_LIBRARY_PATH=/home/orin/.local/lib/python3.10/site-packages/nvidia/nvjitlink/lib:$LD_LIBRARY_PATH
 
 # ROS 2 workspace
-cd /mnt/data/kart_brain
+cd ~/kart_brain
 source /opt/ros/humble/setup.bash && source install/setup.bash
 ```
 
 ## Workspace
 | Path | Description |
 |---|---|
-| `/mnt/data/kart_brain` | Main ROS2 workspace (this repo) |
-| `/mnt/data/driverless` | Legacy Python prototype |
+| `/home/orin/kart_brain` | Main ROS2 workspace (this repo) |
 | `~/Desktop/KART_SW` | Old copy of kart_sw |
 | `~/Desktop/kart_medulla` | ESP32 firmware (PlatformIO) |
 
@@ -66,7 +69,7 @@ source /opt/ros/humble/setup.bash && source install/setup.bash
 ## Live Perception Pipeline
 ```bash
 # All-in-one script
-/mnt/data/kart_brain/run_live.sh
+~/kart_brain/run_live.sh
 
 # Or manually:
 ros2 run kart_perception image_source --ros-args \
@@ -78,10 +81,10 @@ DISPLAY=:1 XAUTHORITY=/run/user/1000/gdm/Xauthority \
 ```
 
 ## Known Issues
-1. **Root filesystem nearly full** (~5 GB free). Install large packages to NVMe `/mnt/data`
-2. **NVMe may not auto-mount** after reboot: `echo '0' | sudo -S mount /dev/nvme0n1p1 /mnt/data`
-3. **torch needs LD_LIBRARY_PATH** set for `libnvJitLink.so.12` (see Environment Setup above)
-4. **numpy must be <2** — cv2 was compiled against numpy 1.x, numpy 2 breaks it
-5. **ZED camera may need re-plug** after reboot
-6. **Webcam mode resolution is low** (672x376 after stereo crop). Consider ZED SDK for full HD + depth
-7. **AnyDesk display**: Xorg forces DFP-0 (DisplayPort) via `/etc/X11/xorg.conf.d/10-virtual-display.conf`
+1. **torch needs LD_LIBRARY_PATH** set for `libnvJitLink.so.12` (see Environment Setup above)
+2. **numpy must be <2** — cv2 was compiled against numpy 1.x, numpy 2 breaks it
+3. **ZED camera may need re-plug** after reboot
+4. **Webcam mode resolution is low** (672x376 after stereo crop). Consider ZED SDK for full HD + depth
+5. **AnyDesk display**: Requires Xorg config at `/etc/X11/xorg.conf.d/10-virtual-display.conf` with `Option "ConnectedMonitor" "DFP-0"` to force a framebuffer on the DisplayPort output. Without this, the NVIDIA driver sees DFP-0 and DFP-1 as "disconnected" (dummy plug via DP-to-HDMI adapter doesn't provide proper EDID), so Xorg has no screen and AnyDesk gets a black framebuffer.
+6. **PyTorch is CPU-only**: `pypi.jetson-ai-lab.dev` was unreachable during install. Needs CUDA-enabled wheel. See TODO.md.
+7. **ZED SDK installer breaks pip permissions**: The installer runs pip as root, leaving `.dist-info` dirs with bad permissions. Fix: `sudo chmod -R a+rX /usr/local/lib/python3.10/dist-packages/`

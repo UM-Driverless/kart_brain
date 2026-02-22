@@ -12,7 +12,7 @@ Before making any changes to the kart_brain workspace, consult:
 
 ### Jetson Orin (Real Hardware)
 - **Connection:** `ssh orin` (WiFi 10.7.20.142) or AnyDesk
-- **Workspace:** `/mnt/data/kart_brain`
+- **Workspace:** `~/kart_brain`
 - **Camera:** ZED 2 stereo (USB)
 - **sudo password:** `0`
 - **Full details:** `.agents/orin_environment.md`
@@ -28,14 +28,14 @@ Before making any changes to the kart_brain workspace, consult:
 ```bash
 # Build everything
 source /opt/ros/humble/setup.bash
-cd /mnt/data/kart_brain && colcon build
+cd ~/kart_brain && colcon build
 source install/setup.bash
 
 # Build single package
 colcon build --packages-select kart_perception
 
 # Live perception on Orin
-/mnt/data/kart_brain/run_live.sh
+~/kart_brain/run_live.sh
 
 # Simulation in VM
 ros2 launch kart_sim simulation.launch.py
@@ -57,6 +57,12 @@ Used everywhere — YOLO class names, Detection messages, visualization:
 - `yellow_cone` — right track boundary
 - `orange_cone` — start/finish markers
 - `large_orange_cone` — large start/finish markers
+
+## Documentation Rules
+- **Document every decision.** When a version is chosen, a workaround is found, or an approach is selected over alternatives, write it down in the relevant `.agents/` file with the date and reasoning.
+- **Document every error.** When something breaks or doesn't work as expected, add it to `.agents/error_log.md` with what happened and the prevention rule.
+- **Document every version.** Software versions, SDK versions, wheel sources, compatibility notes — all go in `.agents/orin_environment.md` or the relevant environment file.
+- **Official docs live in kart_docs.** The `.agents/` directory is for AI agent workflow. Official project documentation goes to https://github.com/UM-Driverless/kart_docs.
 
 ## Commit Protocol
 1. `git status` — check what will be committed
