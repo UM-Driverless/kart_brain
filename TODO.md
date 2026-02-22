@@ -23,6 +23,28 @@
 3. Verify depth image quality — cone forward distances seem short (~1-3m for cones that should be ~5m away), which could be a depth image issue separate from CameraInfo
 4. Consider adding a ramp-up delay or pausing Gazebo until all nodes are ready
 
+## Rebuild kart_brain on Orin
+
+**Status:** Pending — build failed due to missing `ackermann_msgs` (now installed).
+
+**What's needed:**
+```bash
+source /opt/ros/humble/setup.bash && cd ~/kart_brain && colcon build
+```
+`ros-humble-ackermann-msgs` was installed but the build hasn't been re-run yet.
+
+## AnyDesk Remote Access
+
+**Status:** Not working — Orin shows "Client Offline" from Mac.
+
+**Problem:** AnyDesk service is running and ID is `721489674`, but the Orin can't reach AnyDesk relay servers. The Xorg config (`/etc/X11/xorg.conf.d/10-virtual-display.conf` with `ConnectedMonitor DFP-0`) was added but needs a reboot to take effect (X server must restart to load it).
+
+**What's needed:**
+1. Power on the Orin (reboot will apply the Xorg config)
+2. Verify AnyDesk comes online: connect from Mac using ID `721489674`
+3. If still offline, check if the university network (Robots_urjc) blocks AnyDesk relay traffic
+4. Fallback: use SSH (`ssh orin`) — always works on the same network
+
 ## Fix PyTorch CUDA Support on Orin
 
 **Status:** Blocked — Jetson AI Lab wheel index (`pypi.jetson-ai-lab.dev`) is unreachable (DNS doesn't resolve from either Orin or Mac as of 2026-02-22).
