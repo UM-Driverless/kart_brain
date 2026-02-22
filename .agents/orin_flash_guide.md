@@ -113,6 +113,12 @@ This takes ~10-20 minutes. The flash tool outputs "Flash is successful" when don
 
 ## After First Boot
 
+**First boot timing (important):**
+- First boot after flash takes ~5 minutes with no display signal while the system initializes (filesystem setup, SSH key generation, hardware config)
+- If no signal after 5 minutes: power cycle (hold power button 5s, then press again)
+- After power cycle, BIOS/UEFI appears in a few seconds, then Ubuntu takes ~2 minutes to boot
+- There may be a brief period of no signal during boot — this is normal, wait for it
+
 The Orin boots into Ubuntu 22.04 setup wizard (language, user, password). Complete it, then:
 
 ### Set up SSH access
