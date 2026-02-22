@@ -11,6 +11,7 @@ install(PROGRAMS
   scripts/perfect_perception_node.py
   scripts/capture_frames.py
   scripts/evaluate_perception.py
+  scripts/camera_info_fix_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

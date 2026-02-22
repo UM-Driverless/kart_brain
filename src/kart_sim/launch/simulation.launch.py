@@ -6,10 +6,11 @@ Starts:
 3. Perfect perception node OR YOLO perception pipeline
 4. Cone follower control node
 5. Cone marker visualization
+6. CameraInfo fix node (when use_yolo=true)
 
 Launch arguments:
-    use_yolo:=true   → Launch YOLO pipeline (yolo_detector + cone_depth_localizer)
-    use_yolo:=false  → Launch perfect perception (ground truth from SDF) [default]
+    use_yolo:=true   -> Launch YOLO pipeline (yolo_detector + cone_depth_localizer)
+    use_yolo:=false  -> Launch perfect perception (ground truth from SDF) [default]
 """
 import os
 
@@ -51,6 +52,8 @@ def generate_launch_description():
     )
 
     # --- 2. ros_gz_bridge ---
+    # CameraInfo is remapped to _raw; the camera_info_fix_node corrects
+    # the intrinsics and republishes to the final topic.
     bridge = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
@@ -65,11 +68,27 @@ def generate_launch_description():
         remappings=[
             ("/kart/rgbd/image", "/zed/zed_node/rgb/image_rect_color"),
             ("/kart/rgbd/depth_image", "/zed/zed_node/depth/depth_registered"),
-            ("/kart/rgbd/camera_info", "/zed/zed_node/rgb/camera_info"),
+            ("/kart/rgbd/camera_info", "/zed/zed_node/rgb/camera_info_raw"),
             ("/world/fs_track/clock", "/clock"),
         ],
         parameters=[{"use_sim_time": True}],
         output="screen",
+    )
+
+    # --- 2b. CameraInfo fix node (corrects Gazebo intrinsics) ---
+    camera_info_fix = Node(
+        package="kart_sim",
+        executable="camera_info_fix_node.py",
+        name="camera_info_fix",
+        output="screen",
+        parameters=[
+            {
+                "use_sim_time": True,
+                "hfov": 1.396,
+                "input_topic": "/zed/zed_node/rgb/camera_info_raw",
+                "output_topic": "/zed/zed_node/rgb/camera_info",
+            }
+        ],
     )
 
     # --- 3a. Perfect perception node (when use_yolo=false) ---
@@ -114,7 +133,7 @@ def generate_launch_description():
             condition=IfCondition(LaunchConfiguration("use_yolo")),
         )
     except Exception:
-        # kart_perception not built — provide a fallback error message
+        # kart_perception not built -- provide a fallback error message
         perception_launch = ExecuteProcess(
             cmd=["echo", "ERROR: kart_perception package not found. Build it first."],
             output="screen",
@@ -134,7 +153,10 @@ def generate_launch_description():
                 "cmd_vel_topic": "/kart/cmd_vel",
                 "max_speed": 2.0,
                 "min_speed": 0.5,
-                "steering_gain": 1.5,
+                "steering_gain": 2.0,
+                "lookahead_max": 15.0,
+                "half_track_width": 1.5,
+                "speed_curve_factor": 1.5,
             }
         ],
     )
@@ -163,6 +185,7 @@ def generate_launch_description():
             use_yolo_arg,
             gazebo_server,
             TimerAction(period=3.0, actions=[bridge]),
+            TimerAction(period=4.0, actions=[camera_info_fix]),
             TimerAction(period=5.0, actions=[perfect_perception]),
             TimerAction(period=8.0, actions=[perception_launch]),
             TimerAction(period=6.0, actions=[cone_follower]),

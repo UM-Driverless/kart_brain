@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""PID cone-following controller for the kart.
+"""Midpoint-angle cone-following controller for the kart.
 
-Finds the closest blue (left) and yellow (right) cones in front,
-computes the average Y offset as the error signal, and applies
-PID control to steer the kart back to center.
+Finds the nearest blue (left) and yellow (right) cones, computes the
+midpoint between them, and steers toward that midpoint using the angle
+from the kart's forward axis. Speed scales down in proportion to
+steering magnitude (slow in curves, fast on straights).
 
-Long-term goal: replace with a neural net trained via imitation learning.
+The input Detection3DArray positions are in the camera optical frame
+(Z=forward, X=right, Y=down) as produced by projectPixelTo3dRay.
+This node converts to camera_link convention (X=forward, Y=left, Z=up)
+before computing steering.
 """
 import math
 
@@ -21,34 +25,30 @@ class ConeFollowerNode(Node):
 
         self.declare_parameter("detections_topic", "/perception/cones_3d")
         self.declare_parameter("cmd_vel_topic", "/kart/cmd_vel")
-        self.declare_parameter("speed", 2.0)
-        self.declare_parameter("lookahead_max", 10.0)
+        self.declare_parameter("steering_gain", 2.0)
+        self.declare_parameter("max_speed", 2.0)
+        self.declare_parameter("min_speed", 0.5)
+        self.declare_parameter("lookahead_max", 15.0)
+        self.declare_parameter("half_track_width", 1.5)
+        self.declare_parameter("speed_curve_factor", 1.5)
         self.declare_parameter("no_cone_timeout", 1.0)
-        # PID gains (error = avg_y in meters, output = steering in degrees)
-        self.declare_parameter("kp", 0.2)
-        self.declare_parameter("ki", 0.0)
-        self.declare_parameter("kd", 0.15)
 
         det_topic = str(self.get_parameter("detections_topic").value)
         cmd_topic = str(self.get_parameter("cmd_vel_topic").value)
-        self.speed = float(self.get_parameter("speed").value)
+        self.steering_gain = float(self.get_parameter("steering_gain").value)
+        self.max_speed = float(self.get_parameter("max_speed").value)
+        self.min_speed = float(self.get_parameter("min_speed").value)
         self.lookahead_max = float(self.get_parameter("lookahead_max").value)
+        self.half_track_width = float(self.get_parameter("half_track_width").value)
+        self.speed_curve_factor = float(self.get_parameter("speed_curve_factor").value)
         self.no_cone_timeout = float(self.get_parameter("no_cone_timeout").value)
-        self.kp = float(self.get_parameter("kp").value)
-        self.ki = float(self.get_parameter("ki").value)
-        self.kd = float(self.get_parameter("kd").value)
 
         self.cmd_pub = self.create_publisher(Twist, cmd_topic, 10)
         self.sub = self.create_subscription(
             Detection3DArray, det_topic, self._on_detections, 10
         )
 
-        # PID state
-        self._integral = 0.0
-        self._prev_error = 0.0
-        self._last_time = None
         self._last_steer = 0.0
-
         self.last_detection_time = self.get_clock().now()
         self.timer = self.create_timer(0.1, self._safety_check)
 
@@ -57,8 +57,8 @@ class ConeFollowerNode(Node):
 
         nearest_blue = None
         nearest_yellow = None
-        min_blue_dist = float('inf')
-        min_yellow_dist = float('inf')
+        min_blue_dist = float("inf")
+        min_yellow_dist = float("inf")
 
         for det in msg.detections:
             if not det.results:
@@ -66,63 +66,68 @@ class ConeFollowerNode(Node):
             class_id = det.results[0].hypothesis.class_id
             pos = det.results[0].pose.pose.position
 
-            if pos.x <= 0.5:
+            # Convert optical frame (Z=fwd, X=right, Y=down) to
+            # camera_link frame (X=fwd, Y=left, Z=up)
+            fwd = pos.z
+            left = -pos.x
+            # up = -pos.y  (unused)
+
+            if fwd < 0.5:
                 continue
 
-            dist = math.sqrt(pos.x ** 2 + pos.y ** 2)
+            dist = math.sqrt(fwd**2 + left**2)
             if dist > self.lookahead_max:
                 continue
 
             if class_id == "blue_cone" and dist < min_blue_dist:
                 min_blue_dist = dist
-                nearest_blue = pos
+                nearest_blue = (fwd, left)
             elif class_id == "yellow_cone" and dist < min_yellow_dist:
                 min_yellow_dist = dist
-                nearest_yellow = pos
+                nearest_yellow = (fwd, left)
 
-        # Compute error (Y offset from track center, in meters)
-        error = None
+        # Compute midpoint in camera_link frame
+        mid_fwd = None
+        mid_left = None
+
         if nearest_blue and nearest_yellow:
-            error = (nearest_blue.y + nearest_yellow.y) / 2.0
+            mid_fwd = (nearest_blue[0] + nearest_yellow[0]) / 2.0
+            mid_left = (nearest_blue[1] + nearest_yellow[1]) / 2.0
         elif nearest_blue:
-            error = nearest_blue.y - 1.5
+            # Only left boundary visible — offset right by half track width
+            mid_fwd = nearest_blue[0]
+            mid_left = nearest_blue[1] - self.half_track_width
         elif nearest_yellow:
-            error = nearest_yellow.y + 1.5
+            # Only right boundary visible — offset left by half track width
+            mid_fwd = nearest_yellow[0]
+            mid_left = nearest_yellow[1] + self.half_track_width
 
         cmd = Twist()
-        cmd.linear.x = self.speed
 
-        if error is not None:
-            # PID
-            now = self.get_clock().now()
-            if self._last_time is not None:
-                dt = (now - self._last_time).nanoseconds / 1e9
-                dt = max(dt, 0.001)  # avoid division by zero
-            else:
-                dt = 0.1
+        if mid_fwd is not None:
+            # Angle from forward axis to the midpoint (positive = left)
+            angle = math.atan2(mid_left, mid_fwd)
 
-            self._integral += error * dt
-            # Anti-windup: clamp integral
-            self._integral = max(-5.0, min(5.0, self._integral))
-
-            derivative = (error - self._prev_error) / dt
-
-            steer = self.kp * error + self.ki * self._integral + self.kd * derivative
-            # Clamp to max steering (0.5 rad ≈ 29 deg)
+            steer = self.steering_gain * angle
+            # Clamp to max steering (0.5 rad ~ 29 deg)
             steer = max(-0.5, min(0.5, steer))
             cmd.angular.z = steer
+            self._last_steer = steer
 
-            self._prev_error = error
-            self._last_time = now
-            self._last_steer = cmd.angular.z
+            # Speed: slow down in curves
+            speed = self.max_speed * (1.0 - self.speed_curve_factor * abs(steer))
+            speed = max(self.min_speed, min(self.max_speed, speed))
+            cmd.linear.x = speed
 
             self.get_logger().info(
-                f"err={error:.2f}m steer={math.degrees(steer):.1f}deg "
-                f"P={self.kp*error:.1f} I={self.ki*self._integral:.2f} D={self.kd*derivative:.1f} "
-                f"blue={'%.1f'%nearest_blue.y if nearest_blue else '-'} "
-                f"yellow={'%.1f'%nearest_yellow.y if nearest_yellow else '-'}"
+                f"angle={math.degrees(angle):.1f}deg steer={steer:.3f} "
+                f"speed={speed:.1f} "
+                f"blue={nearest_blue} yellow={nearest_yellow} "
+                f"mid=({mid_fwd:.1f},{mid_left:.1f})"
             )
         else:
+            # No cones seen — coast with last steering
+            cmd.linear.x = self.min_speed
             cmd.angular.z = self._last_steer
 
         self.cmd_pub.publish(cmd)
@@ -131,7 +136,7 @@ class ConeFollowerNode(Node):
         elapsed = (self.get_clock().now() - self.last_detection_time).nanoseconds / 1e9
         if elapsed > self.no_cone_timeout:
             cmd = Twist()
-            cmd.linear.x = self.speed
+            cmd.linear.x = self.min_speed
             cmd.angular.z = self._last_steer
             self.cmd_pub.publish(cmd)
 
