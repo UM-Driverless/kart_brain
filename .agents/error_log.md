@@ -12,6 +12,18 @@ Tracks mistakes made during development and the prevention mechanisms added. Eve
 
 ---
 
+## 2026-02-22 - BGR/RGB swap in YOLO annotated image
+**What happened:** The live camera feed in rqt_image_view showed inverted colors (blue sky appeared orange). Root cause: `image_source_node` publishes BGR (from OpenCV), `yolo_detector_node` converts to RGB for inference, then `results.render()` draws on the RGB buffer, but the result was published with `encoding="bgr8"` without converting back.
+**Prevention added:**
+- Added `cv2.cvtColor(rendered[0], cv2.COLOR_RGB2BGR)` before publishing the debug image in `yolo_detector_node.py`
+- Rule: **OpenCV uses BGR, ROS Image with "bgr8" expects BGR, but YOLO/PIL/matplotlib work in RGB.** Whenever passing images between these systems, always verify the channel order matches the declared encoding. If you convert to RGB for inference, convert back to BGR before publishing as "bgr8".
+
+## 2026-02-22 - Duplicate YOLO detector processes consuming all GPU
+**What happened:** Multiple `yolo_detector` instances were running (from both `run_live.sh` and manual launches), each consuming ~500-800% CPU and GPU memory. The system was sluggish.
+**Prevention added:**
+- Rule: Before launching nodes, always check for existing instances: `ps aux | grep yolo_detector | grep -v grep`
+- Rule: Kill stale processes before launching new ones. Use `kill -9` if SIGTERM doesn't work within a few seconds.
+
 ## 2026-02-21 - Cone geometry invisible in Gazebo Fortress
 **What happened:** Used `<cone>` SDF geometry for track cones. Gazebo Fortress (SDF 1.6) does not support cone geometry — it silently renders nothing and logs `Geometry type [0] not supported` for every cone (44 errors). The cones were invisible in the sim.
 **Prevention added:**
@@ -48,5 +60,5 @@ Tracks mistakes made during development and the prevention mechanisms added. Eve
 ## 2026-02-21 - sudo requires password over non-interactive SSH
 **What happened:** `ssh utm "sudo apt install ..."` failed because sudo needs a TTY for password input. `-t` flag doesn't help from non-interactive contexts.
 **Prevention added:**
-- Use `ssh utm 'echo "0" | sudo -S <command>'` for all sudo operations
-- Documented in `.agents/vm_environment.md`
+- Use `ssh <host> 'echo "0" | sudo -S <command>'` for all sudo operations
+- Documented in `.agents/vm_environment.md` and `.agents/orin_environment.md`

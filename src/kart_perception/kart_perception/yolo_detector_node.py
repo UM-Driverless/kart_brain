@@ -119,7 +119,7 @@ class YoloDetectorNode(Node):
         if self.publish_debug_image:
             rendered = results.render()
             if rendered:
-                debug_bgr = rendered[0]
+                debug_bgr = cv2.cvtColor(rendered[0], cv2.COLOR_RGB2BGR)
                 debug_msg = self.bridge.cv2_to_imgmsg(debug_bgr, encoding="bgr8")
                 debug_msg.header = msg.header
                 self.debug_publisher.publish(debug_msg)

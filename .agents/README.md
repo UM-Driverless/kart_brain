@@ -1,6 +1,6 @@
-# Kart SW Agent Documentation
+# Kart Brain Agent Documentation
 
-This directory contains persistent AI-focused documentation for the kart_sw workspace. It follows a two-layer system: **memory** (what agents read) and **enforcement** (what prevents bad work).
+This directory contains persistent AI-focused documentation for the kart_brain workspace. It follows a two-layer system: **memory** (what agents read) and **enforcement** (what prevents bad work).
 
 ## Why This Exists
 
@@ -15,6 +15,7 @@ LLMs have no persistent memory between sessions. Every conversation starts fresh
 | `architecture.md` | Package structure, node graph, message types, topic map |
 | `simulation.md` | Gazebo setup, known issues, rendering quirks, how to test |
 | `vm_environment.md` | UTM VM specifics: SSH, sudo, installed packages, limitations |
+| `orin_environment.md` | Jetson Orin specifics: hardware, ZED camera, live pipeline, known issues |
 | `error_log.md` | Running log of mistakes and prevention mechanisms |
 | `postmortems/` | Detailed failure analysis for significant errors |
 
@@ -30,11 +31,20 @@ LLMs have no persistent memory between sessions. Every conversation starts fresh
 2. **During work:** Follow architecture conventions from `architecture.md`
 3. **Before commit:** Build, verify, `git status` + `git diff`
 4. **If something breaks:** Document in `error_log.md`, add prevention
+5. **If recurring:** Create postmortem in `postmortems/`
+
+## Environment-Specific Guides
+
+| Environment | Doc | Connection |
+|---|---|---|
+| **Jetson Orin** (real hardware) | `orin_environment.md` | `ssh orin` (WiFi) or AnyDesk |
+| **UTM VM** (simulation) | `vm_environment.md` | `ssh utm` (192.168.65.2) |
 
 ## Key Principles
 
 - **Document what was painful** — If you spent time debugging something, write it down
 - **Cone class IDs matter** — The whole pipeline depends on consistent string IDs (`blue_cone`, `yellow_cone`, etc.)
-- **Gazebo Fortress ≠ modern Gazebo** — Uses `ign` CLI, `ignition.msgs.*` types, and lacks some SDF features (no `<cone>` geometry)
-- **No GPU** — Everything renders via LLVMpipe. Keep resolutions low, disable shadows
-- **Odom is relative** — Gazebo odometry starts at (0,0), not at the world pose. Always account for the initial spawn position
+- **BGR vs RGB** — OpenCV uses BGR, YOLO/PIL use RGB. Always verify channel order matches the declared encoding when passing images between systems
+- **Check for stale processes** — Before launching ROS nodes, check if instances are already running
+- **Odom is relative** — Gazebo odometry starts at (0,0), not at the world pose
+- **No GPU in VM** — Everything renders via LLVMpipe. Keep resolutions low, disable shadows

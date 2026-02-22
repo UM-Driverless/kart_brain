@@ -24,12 +24,14 @@ class ImageSourceNode(Node):
         self.declare_parameter("loop", True)
         self.declare_parameter("frame_id", "camera")
         self.declare_parameter("image_topic", "/image_raw")
+        self.declare_parameter("stereo_crop", False)
 
         self.source = pathlib.Path(self.get_parameter("source").value)
         self.loop = bool(self.get_parameter("loop").value)
         self.frame_id = str(self.get_parameter("frame_id").value)
         self.image_topic = str(self.get_parameter("image_topic").value)
         publish_rate = float(self.get_parameter("publish_rate").value)
+        self._stereo_crop = bool(self.get_parameter("stereo_crop").value)
 
         self.bridge = CvBridge()
         self.publisher = self.create_publisher(Image, self.image_topic, 10)
@@ -38,7 +40,17 @@ class ImageSourceNode(Node):
         self._image_index = 0
         self._video_capture: Optional[cv2.VideoCapture] = None
 
-        if self.source.is_dir():
+        source_str = str(self.source)
+        # Webcam: integer index (e.g. "0") or device path (e.g. "/dev/video0")
+        if source_str.isdigit():
+            self._video_capture = cv2.VideoCapture(int(source_str))
+            if not self._video_capture.isOpened():
+                self.get_logger().error(f"Failed to open webcam {source_str}")
+        elif self.source.is_char_device():
+            self._video_capture = cv2.VideoCapture(source_str)
+            if not self._video_capture.isOpened():
+                self.get_logger().error(f"Failed to open device {source_str}")
+        elif self.source.is_dir():
             self._image_paths = sorted(
                 [p for p in self.source.iterdir() if p.suffix.lower() in IMAGE_EXTS]
             )
@@ -63,6 +75,8 @@ class ImageSourceNode(Node):
         self.timer = self.create_timer(1.0 / publish_rate, self._on_timer)
 
     def _publish_image(self, frame) -> None:
+        if self._stereo_crop:
+            frame = frame[:, :frame.shape[1] // 2]
         msg = self.bridge.cv2_to_imgmsg(frame, encoding="bgr8")
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.header.frame_id = self.frame_id

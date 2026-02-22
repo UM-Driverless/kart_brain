@@ -1,67 +1,58 @@
 # Agent Quick Reference
 
 ## Key Files (Read Before Working)
-Before making any changes to the kart_sw workspace, consult:
+Before making any changes to the kart_brain workspace, consult:
 1. **`.agents/architecture.md`** — System architecture, packages, topic map, message types
-2. **`.agents/simulation.md`** — Gazebo simulation setup, known issues, how to run
-3. **`.agents/error_log.md`** — Past errors and added preventions
-4. **`.agents/vm_environment.md`** — UTM VM specifics, SSH, sudo, installed software
+2. **`.agents/error_log.md`** — Past errors and added preventions
+3. **Environment-specific guide:**
+   - Working on **real hardware (Orin)?** → `.agents/orin_environment.md`
+   - Working on **simulation (VM)?** → `.agents/simulation.md` + `.agents/vm_environment.md`
 
-## Environment
-- **Dev machine:** macOS, SSH into UTM VM via `ssh utm` (192.168.65.2)
-- **VM:** Ubuntu 22.04 arm64, 8GB RAM, 4 cores, no GPU (LLVMpipe software rendering)
-- **ROS 2:** Humble (desktop install)
-- **Simulator:** Gazebo Fortress (ign-gazebo 6.16.0) via `ros-humble-ros-gz`
-- **Workspace:** `~/kart_sw/` (colcon workspace, git repo)
-- **sudo password:** `0` (pipe via `echo "0" | sudo -S <cmd>`)
+## Environments
+
+### Jetson Orin (Real Hardware)
+- **Connection:** `ssh orin` (WiFi 10.7.20.142) or AnyDesk
+- **Workspace:** `/mnt/data/kart_brain`
+- **Camera:** ZED 2 stereo (USB)
+- **sudo password:** `0`
+- **Full details:** `.agents/orin_environment.md`
+
+### UTM VM (Simulation)
+- **Connection:** `ssh utm` (192.168.65.2)
+- **Workspace:** `~/kart_sw/`
+- **Simulator:** Gazebo Fortress (headless, CPU rendering)
+- **sudo password:** `0`
+- **Full details:** `.agents/vm_environment.md`
 
 ## Build & Run
 ```bash
 # Build everything
 source /opt/ros/humble/setup.bash
-cd ~/kart_sw && colcon build
+cd /mnt/data/kart_brain && colcon build
 source install/setup.bash
 
 # Build single package
-colcon build --packages-select kart_sim
+colcon build --packages-select kart_perception
 
-# Run simulation (perfect perception + cone follower)
-export IGN_GAZEBO_RESOURCE_PATH=$(ros2 pkg prefix kart_sim)/share/kart_sim/models
+# Live perception on Orin
+/mnt/data/kart_brain/run_live.sh
+
+# Simulation in VM
 ros2 launch kart_sim simulation.launch.py
-
-# Run simulation with YOLO pipeline instead
-ros2 launch kart_sim simulation.launch.py use_perception:=true use_perfect_perception:=false
 ```
 
 ## Key Paths
 | Path | Description |
 |---|---|
-| `~/kart_sw/src/kart_sim/` | Gazebo simulation package (this session's work) |
-| `~/kart_sw/src/kart_perception/` | Perception pipeline (YOLO + depth + viz) |
-| `~/kart_sw/src/kart_bringup/` | Launch files and config for real hardware |
-| `~/kart_sw/src/joy_to_cmd_vel/` | Joystick teleop (C++) |
-| `~/kart_sw/src/msgs_to_micro/` | ESP32 serial comms (C++) |
-| `~/kart_sw/models/perception/yolo/best_adri.pt` | YOLO weights |
-
-## Topic Map (Simulation Mode)
-```
-Gazebo Server
-  ├─→ /kart/rgbd/image          ──bridge──→ /zed/zed_node/rgb/image_rect_color
-  ├─→ /kart/rgbd/depth_image    ──bridge──→ /zed/zed_node/depth/depth_registered
-  ├─→ /kart/rgbd/camera_info    ──bridge──→ /zed/zed_node/rgb/camera_info
-  ├─→ /world/fs_track/clock     ──bridge──→ /clock
-  └─→ /model/kart/odometry      ──bridge──→ /model/kart/odometry
-
-Perfect Perception Node (or YOLO pipeline)
-  └─→ /perception/cones_3d      (Detection3DArray)
-
-Cone Follower Node
-  ├─← /perception/cones_3d
-  └─→ /kart/cmd_vel             ──bridge──→ Gazebo Ackermann plugin
-```
+| `src/kart_perception/` | Perception pipeline (YOLO + depth + viz) |
+| `src/kart_sim/` | Gazebo simulation package |
+| `src/kart_bringup/` | Launch files and config for real hardware |
+| `src/joy_to_cmd_vel/` | Joystick teleop (C++) |
+| `src/msgs_to_micro/` | ESP32 serial comms (C++) |
+| `models/perception/yolo/best_adri.pt` | YOLO weights |
 
 ## Cone Class IDs
-Used in `Detection3DArray.detections[].results[].hypothesis.class_id`:
+Used everywhere — YOLO class names, Detection messages, visualization:
 - `blue_cone` — left track boundary
 - `yellow_cone` — right track boundary
 - `orange_cone` — start/finish markers
@@ -71,4 +62,5 @@ Used in `Detection3DArray.detections[].results[].hypothesis.class_id`:
 1. `git status` — check what will be committed
 2. `git diff --cached` — review changes
 3. Build and verify before committing
-4. If a recurring mistake happens, document it in `.agents/error_log.md`
+4. If a mistake occurred, document it in `.agents/error_log.md`
+5. If recurring, create a postmortem in `.agents/postmortems/`
