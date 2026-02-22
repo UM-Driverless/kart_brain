@@ -65,6 +65,26 @@ lsusb | grep -i nvidia
 ### USB-C cable placement
 The USB-C cable from the y540 goes to the Orin's **flashing port** — the USB-C port **next to the 40-pin GPIO header**, NOT the USB-C power port above the DC jack.
 
+## How the Boot Chain Works
+
+The Orin has three storage devices involved in booting:
+
+```
+QSPI flash (on-chip)     →  First-stage bootloader (firmware)
+eMMC (57 GB, soldered)    →  Second-stage bootloader + boot partition (GPT + boot records)
+NVMe M.2 SSD (476 GB)    →  Full Ubuntu root filesystem (where the OS lives)
+```
+
+**Boot sequence:** QSPI → eMMC bootloader → NVMe root filesystem
+
+- **QSPI**: Tiny on-chip flash. Holds the very first code the CPU runs at power-on. Always needed.
+- **eMMC**: The 57 GB internal storage soldered to the board. After NVMe flash, it only holds a small bootloader — NOT a full OS. It cannot be removed.
+- **NVMe**: The M.2 SSD you plugged into the board. This is where Ubuntu and all your software lives. All 476 GB available for the root filesystem.
+
+The flash tool writes to **all three**: QSPI gets firmware, eMMC gets the bootloader, NVMe gets the OS. This is expected — the eMMC is NOT getting a full OS, just the boot chain entry point.
+
+**To verify after boot:** `df -h /` should show `/dev/nvme0n1p1`, NOT `/dev/mmcblk0p1`.
+
 ## Flash to NVMe
 
 ```bash
@@ -81,7 +101,15 @@ sudo ./tools/kernel_flash/l4t_initrd_flash.sh \
   nvme0n1p1
 ```
 
-This takes ~10-20 minutes. The Orin will reboot automatically when done.
+This takes ~10-20 minutes. The flash tool outputs "Flash is successful" when done. The Orin will reboot automatically.
+
+### What the flash tool does (step by step)
+1. **Step 1**: Generates flash packages (signs bootloader, compresses images)
+2. **Step 2**: Boots the Orin into a temporary initrd Linux via USB
+3. **Step 3**: Writes bootloader to eMMC, creates GPT partition tables
+4. **Step 4**: Writes the full root filesystem to NVMe
+5. **Step 5**: Writes QSPI firmware
+6. **Reboots** the Orin into the freshly installed Ubuntu on NVMe
 
 ## After First Boot
 
@@ -155,5 +183,15 @@ ros2 --help                       # ROS 2
 ## Notes
 
 - **JetPack 7** does not support AGX Orin as of Feb 2026. JetPack 7.2 (with Orin support) is expected Q2 2026.
-- The eMMC still has the old OS. After confirming NVMe boot works, the eMMC can serve as fallback.
+- The eMMC still has a bootloader. The old OS on eMMC is overwritten by the flash tool's boot partition. If you need a fallback OS, you'd need to reflash to eMMC explicitly.
 - DHCP IPs may change after reflash. Always verify with `hostname -I` on the Orin.
+- The flash host (y540) only needs Ubuntu 24.04 or 22.04 x86_64. Ubuntu 24.04 is supported for flashing JetPack 6.2.2 but NOT for "host development" (cross-compilation). This doesn't matter for us — we develop directly on the Orin.
+- Flash files on y540 are at `~/jetson-flash/` (~5 GB total). Can be deleted after successful flash to free space.
+
+## Decision Log
+
+### Why JetPack 6.2.2 and not JetPack 7? (2026-02-22)
+JetPack 7.0/7.1 only supports Jetson Thor, NOT AGX Orin. Orin support comes in JetPack 7.2 (expected Q2 2026, already slipped from Q1). Our full stack (ROS 2 Humble, ZED SDK, PyTorch 2.5, YOLOv5) is confirmed compatible with JetPack 6.2.2. No reason to wait.
+
+### Why command-line flash and not SDK Manager? (2026-02-22)
+SDK Manager has issues on Ubuntu 24.04 (the y540's OS). The command-line L4T tools (`l4t_initrd_flash.sh`) are what SDK Manager uses under the hood anyway, and they work reliably on Ubuntu 24.04 for flashing. We can drive the entire process over SSH.
