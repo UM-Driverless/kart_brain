@@ -1,0 +1,170 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <world name="fs_track">
+
+    <!-- Physics: run at wall-clock speed -->
+    <physics name="sim" type="ode">
+      <max_step_size>0.004</max_step_size>
+      <real_time_update_rate>250</real_time_update_rate>
+      <real_time_factor>1</real_time_factor>
+    </physics>
+
+    <!-- Sensors plugin (renders camera images) -->
+    <plugin
+      filename="ignition-gazebo-sensors-system"
+      name="ignition::gazebo::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+    <!-- Scene broadcaster for topic state -->
+    <plugin
+      filename="ignition-gazebo-scene-broadcaster-system"
+      name="ignition::gazebo::systems::SceneBroadcaster">
+    </plugin>
+
+    <!-- Physics plugin -->
+    <plugin
+      filename="ignition-gazebo-physics-system"
+      name="ignition::gazebo::systems::Physics">
+    </plugin>
+
+    <!-- User commands (e.g. for spawn/delete) -->
+    <plugin
+      filename="ignition-gazebo-user-commands-system"
+      name="ignition::gazebo::systems::UserCommands">
+    </plugin>
+
+    <!-- Sun (no shadows for performance) -->
+    <light name="sun" type="directional">
+      <cast_shadows>false</cast_shadows>
+      <pose>0 0 20 0 0 0</pose>
+      <diffuse>0.9 0.9 0.9 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <direction>-0.3 0.2 -1.0</direction>
+    </light>
+
+    <!-- Ambient light -->
+    <scene>
+      <ambient>0.6 0.6 0.6 1</ambient>
+      <background>0.4 0.6 0.9 1</background>
+    </scene>
+
+    <!-- Ground plane (dark asphalt) -->
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>200 200</size>
+            </plane>
+          </geometry>
+          <surface>
+            <friction>
+              <ode><mu>1.0</mu><mu2>1.0</mu2></ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>200 200</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.3 0.3 0.3 1</ambient>
+            <diffuse>0.3 0.3 0.3 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Kart (start position: right straight, facing +Y) -->
+    <include>
+      <uri>model://kart</uri>
+      <name>kart</name>
+      <pose>20 0 0 0 0 1.5708</pose>
+    </include>
+
+    <!--
+      Oval track layout:
+      - Blue cones on the LEFT (inner) boundary
+      - Yellow cones on the RIGHT (outer) boundary
+      - Orange big cones at start/finish
+      - Track width ~3m, cone spacing ~5m on straights
+      - Kart starts at (20, 0) facing +Y, drives counterclockwise
+
+      Small cone mesh half-height: 0.1517m (z-offset to sit on ground)
+      Big cone scaled half-height: 0.252m
+    -->
+
+    <!-- === RIGHT STRAIGHT (x=20, going +Y from -10 to +10) === -->
+    <!-- Blue cones (left/inner side = x=18.5) -->
+    <include><uri>model://cone_blue</uri><name>blue_rs_0</name><pose>18.5 -10 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_rs_1</name><pose>18.5 -5 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_rs_2</name><pose>18.5 0 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_rs_3</name><pose>18.5 5 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_rs_4</name><pose>18.5 10 0.1517 0 0 0</pose></include>
+
+    <!-- Yellow cones (right/outer side = x=21.5) -->
+    <include><uri>model://cone_yellow</uri><name>yellow_rs_0</name><pose>21.5 -10 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_rs_1</name><pose>21.5 -5 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_rs_2</name><pose>21.5 0 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_rs_3</name><pose>21.5 5 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_rs_4</name><pose>21.5 10 0.1517 0 0 0</pose></include>
+
+    <!-- === LEFT STRAIGHT (x=-20, going -Y from +10 to -10) === -->
+    <!-- Blue cones (left/inner side = x=-18.5) -->
+    <include><uri>model://cone_blue</uri><name>blue_ls_0</name><pose>-18.5 10 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_ls_1</name><pose>-18.5 5 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_ls_2</name><pose>-18.5 0 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_ls_3</name><pose>-18.5 -5 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_ls_4</name><pose>-18.5 -10 0.1517 0 0 0</pose></include>
+
+    <!-- Yellow cones (right/outer side = x=-21.5) -->
+    <include><uri>model://cone_yellow</uri><name>yellow_ls_0</name><pose>-21.5 10 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_ls_1</name><pose>-21.5 5 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_ls_2</name><pose>-21.5 0 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_ls_3</name><pose>-21.5 -5 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_ls_4</name><pose>-21.5 -10 0.1517 0 0 0</pose></include>
+
+    <!-- === TOP CURVE (semicircle center at 0,10, right to left) === -->
+    <!-- Blue inner curve (radius 18.5) -->
+    <include><uri>model://cone_blue</uri><name>blue_tc_0</name><pose>16.02 14.25 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_tc_1</name><pose>9.25 18.02 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_tc_2</name><pose>0 20 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_tc_3</name><pose>-9.25 18.02 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_tc_4</name><pose>-16.02 14.25 0.1517 0 0 0</pose></include>
+
+    <!-- Yellow outer curve (radius 21.5) -->
+    <include><uri>model://cone_yellow</uri><name>yellow_tc_0</name><pose>18.62 16.75 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_tc_1</name><pose>10.75 20.62 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_tc_2</name><pose>0 23 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_tc_3</name><pose>-10.75 20.62 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_tc_4</name><pose>-18.62 16.75 0.1517 0 0 0</pose></include>
+
+    <!-- === BOTTOM CURVE (semicircle center at 0,-10, left to right) === -->
+    <!-- Blue inner curve (radius 18.5) -->
+    <include><uri>model://cone_blue</uri><name>blue_bc_0</name><pose>-16.02 -14.25 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_bc_1</name><pose>-9.25 -18.02 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_bc_2</name><pose>0 -20 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_bc_3</name><pose>9.25 -18.02 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_bc_4</name><pose>16.02 -14.25 0.1517 0 0 0</pose></include>
+
+    <!-- Yellow outer curve (radius 21.5) -->
+    <include><uri>model://cone_yellow</uri><name>yellow_bc_0</name><pose>-18.62 -16.75 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_bc_1</name><pose>-10.75 -20.62 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_bc_2</name><pose>0 -23 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_bc_3</name><pose>10.75 -20.62 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_bc_4</name><pose>18.62 -16.75 0.1517 0 0 0</pose></include>
+
+    <!-- === ORANGE BIG CONES at start/finish (right straight, y≈0) === -->
+    <include><uri>model://cone_orange_big</uri><name>orange_sf_0</name><pose>18.0 -0.5 0.252 0 0 0</pose></include>
+    <include><uri>model://cone_orange_big</uri><name>orange_sf_1</name><pose>18.0 0.5 0.252 0 0 0</pose></include>
+    <include><uri>model://cone_orange_big</uri><name>orange_sf_2</name><pose>22.0 -0.5 0.252 0 0 0</pose></include>
+    <include><uri>model://cone_orange_big</uri><name>orange_sf_3</name><pose>22.0 0.5 0.252 0 0 0</pose></include>
+
+  </world>
+</sdf>

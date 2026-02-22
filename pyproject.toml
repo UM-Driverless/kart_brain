@@ -1,0 +1,24 @@
+[project]
+name = "kart_sw"
+version = "0.0.0"
+description = "Workspace dependencies for kart_sw Python tools."
+dependencies = [
+  "gitpython>=3.1.30",
+  "matplotlib>=3.3",
+  "numpy<2",
+  "pillow>=10.3.0",
+  "psutil",
+  "pyyaml>=5.3.1",
+  "requests>=2.32.2",
+  "scipy>=1.4.1",
+  "seaborn>=0.11.0",
+  "setuptools>=70.0.0",
+  "thop>=0.1.1",
+  "torch",
+  "torchvision",
+  "tqdm>=4.66.3",
+  "ultralytics",
+  "pandas>=1.1.4",
+  "packaging",
+  "urllib3>=2.5.0",
+]
