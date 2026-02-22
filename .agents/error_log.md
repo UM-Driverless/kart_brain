@@ -62,3 +62,15 @@ Tracks mistakes made during development and the prevention mechanisms added. Eve
 **Prevention added:**
 - Use `ssh <host> 'echo "0" | sudo -S <command>'` for all sudo operations
 - Documented in `.agents/vm_environment.md` and `.agents/orin_environment.md`
+
+## 2026-02-22 - Wrong IP for y540 laptop, wasted time on SSH setup
+**What happened:** The laptop (y540) was given IP 10.7.20.136 but DHCP had assigned 10.7.20.138. Spent multiple attempts trying to connect to the wrong IP. Also referenced IPs without labeling which machine they belonged to, causing confusion.
+**Prevention added:**
+- Rule: **All machines on Robots_urjc use DHCP — IPs can change.** Always verify the current IP with `hostname -I` on the target machine before attempting SSH.
+- Rule: **Always label IPs with the machine name** (e.g., "Mac at 10.7.20.28", "Orin at 10.7.20.142") — never mention bare IPs.
+- Rule: **SSH config hostnames are the source of truth** (`ssh orin`, `ssh y540`). When an IP changes, update `~/.ssh/config` on the Mac.
+
+## 2026-02-22 - SSH server not installed on fresh Ubuntu laptop
+**What happened:** Tried to SSH into the y540 laptop but got "Connection refused" — openssh-server was not installed. Cannot install it remotely without SSH access.
+**Prevention added:**
+- Rule: When setting up a new machine for remote access, the **first step is always installing openssh-server** on it physically: `sudo apt install -y openssh-server`
