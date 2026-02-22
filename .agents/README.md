@@ -16,6 +16,7 @@ LLMs have no persistent memory between sessions. Every conversation starts fresh
 | `simulation.md` | Gazebo setup, known issues, rendering quirks, how to test |
 | `vm_environment.md` | UTM VM specifics: SSH, sudo, installed packages, limitations |
 | `orin_environment.md` | Jetson Orin specifics: hardware, ZED camera, live pipeline, known issues |
+| `orin_flash_guide.md` | Step-by-step guide for flashing Orin to NVMe with JetPack 6.2.2 |
 | `error_log.md` | Running log of mistakes and prevention mechanisms |
 | `postmortems/` | Detailed failure analysis for significant errors |
 
@@ -38,6 +39,8 @@ LLMs have no persistent memory between sessions. Every conversation starts fresh
 | Environment | Doc | Connection |
 |---|---|---|
 | **Jetson Orin** (real hardware) | `orin_environment.md` | `ssh orin` (WiFi) or AnyDesk |
+| **Jetson Orin** (flash/reinstall) | `orin_flash_guide.md` | USB-C from y540 to Orin |
+| **y540 laptop** (flash host) | — | `ssh y540` (Robots_urjc WiFi, DHCP) |
 | **UTM VM** (simulation) | `vm_environment.md` | `ssh utm` (192.168.65.2) |
 
 ## Key Principles
