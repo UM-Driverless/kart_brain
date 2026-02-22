@@ -9,6 +9,10 @@ Complete guide for flashing the Jetson AGX Orin to boot from NVMe SSD with JetPa
 | Target | Jetson AGX Orin Developer Kit |
 | JetPack | 6.2.2 (L4T R36.5, released 2026-02-06) |
 | Target OS | Ubuntu 22.04 |
+| CUDA | 12.6 (bundled with JetPack, not chosen separately) |
+| cuDNN | 9.x (bundled) |
+| TensorRT | 10.x (bundled) |
+| All installed via | `sudo apt install nvidia-jetpack` (meta-package) |
 | Flash host | y540 laptop (Ubuntu 24.04, x86_64) — `ssh y540` |
 | Connection | USB-C from y540 → Orin flashing port (next to 40-pin GPIO header) |
 
