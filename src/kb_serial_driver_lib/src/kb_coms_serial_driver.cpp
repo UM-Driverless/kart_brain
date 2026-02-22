@@ -365,6 +365,7 @@ int SerialDriver::process_byte(uint8_t byte)
             if (byte == SOF)
             {
                 frame_start_ = now;
+                payload_.clear();
                 state_ = State::LEN;
             }
             break;
@@ -407,7 +408,12 @@ int SerialDriver::process_byte(uint8_t byte)
                 return 1;
 
             } else {
-                std::cout << "Error, el CRC no coincide" << std::endl;
+                std::cerr << "CRC mismatch: computed=0x" << std::hex
+                          << (int)crc << " received=0x" << (int)byte
+                          << std::dec << " len=" << (int)len_
+                          << " type=0x" << std::hex << (int)type_
+                          << std::dec << " payload_size="
+                          << payload_.size() << std::endl;
                 rx_crc_error_++;
             }
 

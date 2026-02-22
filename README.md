@@ -40,6 +40,47 @@ Requires a joystick at `/dev/input/js0` and the kart microcontroller on `/dev/tt
 ros2 launch kart_bringup teleop_launch.py
 ```
 
+## ESP32 Communications (`kb_coms_micro`)
+
+The `kb_coms_micro` ROS node bridges ROS 2 topics and the ESP32 microcontroller over USB serial. It depends on `kb_serial_driver_lib`, a pure C++ library (no ROS dependency) that handles all serial I/O and protocol parsing.
+
+### Architecture
+
+```
+ESP32  ──USB serial──▶  kb_serial_driver_lib  ──callback──▶  kb_coms_micro (ROS node)  ──▶  ROS topics
+                         (3 threads, no ROS)                  (routes by msg type)
+```
+
+**kb_serial_driver_lib** runs three threads:
+- **Supervisor** — opens the serial port and auto-reconnects on failure.
+- **RX** — blocking `read()` into a 256-byte buffer, feeds bytes to a protocol state machine.
+- **TX** — waits on a condition variable, writes queued frames to the port.
+
+**kb_coms_micro** receives parsed frames via callback and publishes to ROS topics based on message type (e.g. `ESP_HEARTBEAT` → `/esp32/heartbeat`). Outgoing ROS messages are forwarded to the serial driver's thread-safe `send()`.
+
+### Wire Protocol
+
+```
++------+-----+------+---------+-----+
+| SOF  | LEN | TYPE | PAYLOAD | CRC |
++------+-----+------+---------+-----+
+  1B     1B    1B     0-255B    1B
+```
+
+- **SOF**: `0xAA` start-of-frame marker.
+- **LEN**: payload byte count.
+- **TYPE**: message type (see `Frame.msg` for the full list).
+- **CRC**: CRC-8 (polynomial `0x07`) computed over LEN + TYPE + PAYLOAD.
+
+### ROS Interface
+
+| Direction | Topic | Message |
+|-----------|-------|---------|
+| ESP32 → Orin | `/esp32/heartbeat` | `kb_interfaces/msg/Frame` |
+| Orin → ESP32 | `/ejemplo_sub` | `kb_interfaces/msg/Frame` |
+
+Parameters: `serial_port` (default: CP2102 USB-UART path), `baudrate` (default: 115200).
+
 ## FAQ
 
 **Why ROS 2 and not ROS 1?**
