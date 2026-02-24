@@ -41,7 +41,7 @@ class YoloDetectorNode(Node):
         self.declare_parameter("conf_threshold", 0.25)
         self.declare_parameter("iou_threshold", 0.45)
         self.declare_parameter("imgsz", 640)
-        self.declare_parameter("device", "0")
+        self.declare_parameter("device", "")
         self.declare_parameter("publish_debug_image", True)
 
         self.image_topic = str(self.get_parameter("image_topic").value)
@@ -87,7 +87,11 @@ class YoloDetectorNode(Node):
             )
             model.conf = self.conf_threshold
             model.iou = self.iou_threshold
-            model.to(self.device)
+            device = self.device
+            if not device:
+                device = "0" if torch.cuda.is_available() else "cpu"
+            self.get_logger().info(f"YOLO device: {device} (CUDA available: {torch.cuda.is_available()})")
+            model.to(device)
             return model
         except Exception as exc:
             self.get_logger().error(f"Failed to load YOLO model: {exc}")
