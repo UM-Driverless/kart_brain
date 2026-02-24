@@ -10,6 +10,7 @@ Composites steering visualizations onto the YOLO-annotated image:
 - Status indicator (BLUE + YLW / BLUE ONLY / YLW ONLY / NO CONES)
 """
 import math
+import time
 
 import cv2
 import numpy as np
@@ -53,6 +54,9 @@ class SteeringHudNode(Node):
         self.fx = self.fy = self.cx = self.cy = None
         self.camera_info_ready = False
         self.latest_annotated = None
+        self._fps_last_time = time.monotonic()
+        self._fps_count = 0
+        self._fps = 0.0
 
         # Publisher
         self.pub = self.create_publisher(
@@ -111,7 +115,17 @@ class SteeringHudNode(Node):
                 f"cx={self.cx:.1f} cy={self.cy:.1f}"
             )
 
+    def _update_fps(self):
+        self._fps_count += 1
+        now = time.monotonic()
+        elapsed = now - self._fps_last_time
+        if elapsed >= 1.0:
+            self._fps = self._fps_count / elapsed
+            self._fps_count = 0
+            self._fps_last_time = now
+
     def _on_synced(self, img_msg: Image, cones_msg: Detection3DArray):
+        self._update_fps()
         img = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="bgr8")
         self.latest_annotated = img.copy()
 
@@ -259,6 +273,7 @@ class SteeringHudNode(Node):
         lines = [
             f"Steer: {steer_deg:+.1f} deg",
             f"Speed: {speed:.1f} m/s",
+            f"FPS: {self._fps:.1f}",
         ]
         y0 = 25
         for i, line in enumerate(lines):
