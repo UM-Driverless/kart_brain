@@ -2,7 +2,6 @@
 import os
 import pathlib
 import warnings
-from typing import Optional
 
 import cv2
 import rclpy
@@ -12,7 +11,6 @@ from sensor_msgs.msg import Image
 from vision_msgs.msg import BoundingBox2D, Detection2D, Detection2DArray, ObjectHypothesisWithPose
 
 
-# Suppress YOLOv5 autocast deprecation warnings globally.
 warnings.filterwarnings(
     "ignore",
     message=".*autocast\\(args...\\).*deprecated.*",
@@ -37,7 +35,7 @@ class YoloDetectorNode(Node):
         self.declare_parameter("image_topic", "/image_raw")
         self.declare_parameter("detections_topic", "/perception/cones_2d")
         self.declare_parameter("debug_image_topic", "/perception/yolo/annotated")
-        self.declare_parameter("weights_path", "models/perception/yolo/best_adri.pt")
+        self.declare_parameter("weights_path", "models/perception/yolo/nava_yolov11_2026_02.pt")
         self.declare_parameter("conf_threshold", 0.25)
         self.declare_parameter("iou_threshold", 0.45)
         self.declare_parameter("imgsz", 640)
@@ -61,47 +59,126 @@ class YoloDetectorNode(Node):
             Image, self.image_topic, self._on_image, 1
         )
 
+        self._use_ultralytics = False
         self.model = self._load_model()
-        self.class_names = None if self.model is None else self.model.names
+        self.class_names = self._get_class_names()
+
+    def _resolve_device(self) -> str:
+        device = self.device
+        if not device:
+            import torch
+            device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        return device
 
     def _load_model(self):
         if not self.weights_path.exists():
             self.get_logger().error(f"Weights not found: {self.weights_path}")
             return None
-        # Ensure matplotlib uses a non-GUI backend and suppress Axes3D warning.
         os.environ.setdefault("MPLBACKEND", "Agg")
-        warnings.filterwarnings(
-            "ignore",
-            message="Unable to import Axes3D.*",
-            module="matplotlib",
-        )
-        # Keep additional filters near model load for clarity.
+
+        device = self._resolve_device()
+        self.get_logger().info(f"Loading YOLO weights: {self.weights_path} on {device}")
+
+        # Try ultralytics (YOLOv8/v11) first, fall back to torch.hub (YOLOv5)
+        try:
+            from ultralytics import YOLO
+            model = YOLO(str(self.weights_path))
+            model.to(device)
+            self._use_ultralytics = True
+            self.get_logger().info(f"Loaded model via ultralytics API (device: {device})")
+            return model
+        except Exception as exc:
+            self.get_logger().warn(f"ultralytics load failed ({exc}), trying torch.hub YOLOv5...")
+
         try:
             import torch
-        except ImportError:
-            self.get_logger().error("torch not installed; cannot load YOLO model")
-            return None
-        try:
             model = torch.hub.load(
                 "ultralytics/yolov5", "custom", path=str(self.weights_path)
             )
             model.conf = self.conf_threshold
             model.iou = self.iou_threshold
             model.imgsz = self.imgsz
-            device = self.device
-            if not device:
-                device = "cuda:0" if torch.cuda.is_available() else "cpu"
-            self.get_logger().info(f"YOLO device: {device} (CUDA available: {torch.cuda.is_available()})")
             model.to(device)
+            self._use_ultralytics = False
+            self.get_logger().info(f"Loaded model via torch.hub YOLOv5 (device: {device})")
             return model
         except Exception as exc:
             self.get_logger().error(f"Failed to load YOLO model: {exc}")
             return None
 
+    def _get_class_names(self):
+        if self.model is None:
+            return None
+        if self._use_ultralytics:
+            return self.model.names  # dict {0: "blue_cone", ...}
+        return self.model.names  # same format for YOLOv5
+
     def _on_image(self, msg: Image) -> None:
         if self.model is None:
             return
         frame_bgr = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+
+        if self._use_ultralytics:
+            self._infer_ultralytics(msg, frame_bgr)
+        else:
+            self._infer_yolov5(msg, frame_bgr)
+
+    def _infer_ultralytics(self, msg: Image, frame_bgr) -> None:
+        results = self.model(
+            frame_bgr,
+            imgsz=self.imgsz,
+            conf=self.conf_threshold,
+            iou=self.iou_threshold,
+            verbose=False,
+        )
+        detections = Detection2DArray()
+        detections.header = msg.header
+        parsed = []
+
+        for r in results:
+            for box in r.boxes:
+                x1, y1, x2, y2 = box.xyxy[0].tolist()
+                conf = float(box.conf[0])
+                cls_id = int(box.cls[0])
+                name = self.class_names[cls_id] if self.class_names else str(cls_id)
+
+                bbox = BoundingBox2D()
+                bbox.center.position.x = (x1 + x2) / 2.0
+                bbox.center.position.y = (y1 + y2) / 2.0
+                bbox.center.theta = 0.0
+                bbox.size_x = max(0.0, x2 - x1)
+                bbox.size_y = max(0.0, y2 - y1)
+
+                hypothesis = ObjectHypothesisWithPose()
+                hypothesis.hypothesis.class_id = str(name)
+                hypothesis.hypothesis.score = conf
+
+                detection = Detection2D()
+                detection.bbox = bbox
+                detection.results.append(hypothesis)
+                detections.detections.append(detection)
+
+                color = CLASS_COLORS.get(name, DEFAULT_COLOR)
+                p1, p2 = (int(x1), int(y1)), (int(x2), int(y2))
+                parsed.append((p1, p2, color, name, conf))
+
+        self.publisher.publish(detections)
+
+        if self.publish_debug_image:
+            debug_img = frame_bgr.copy()
+            for p1, p2, color, name, conf in parsed:
+                cv2.rectangle(debug_img, p1, p2, color, 3)
+            for p1, _, color, name, conf in parsed:
+                label = f"{name.replace('_cone', '')} {conf:.0%}"
+                (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                cv2.rectangle(debug_img, (p1[0], p1[1] - th - 8), (p1[0] + tw + 6, p1[1]), color, -1)
+                cv2.putText(debug_img, label, (p1[0] + 3, p1[1] - 5),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2, cv2.LINE_AA)
+            debug_msg = self.bridge.cv2_to_imgmsg(debug_img, encoding="bgr8")
+            debug_msg.header = msg.header
+            self.debug_publisher.publish(debug_msg)
+
+    def _infer_yolov5(self, msg: Image, frame_bgr) -> None:
         frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
         results = self.model(frame_rgb)
         detections = Detection2DArray()
@@ -132,7 +209,6 @@ class YoloDetectorNode(Node):
 
         if self.publish_debug_image:
             debug_img = frame_bgr.copy()
-            # Two-pass: boxes first, then labels on top (prevents overlap)
             parsed = []
             for det in results.xyxy[0].tolist():
                 x1, y1, x2, y2, conf, cls_id = det

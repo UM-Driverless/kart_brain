@@ -23,7 +23,7 @@ ros2 run kart_perception yolo_detector --ros-args \
   -p image_topic:=/image_raw \
   -p detections_topic:=/perception/cones_2d \
   -p debug_image_topic:=/perception/yolo/annotated \
-  -p weights_path:=models/perception/yolo/best_adri.pt &
+  -p weights_path:=models/perception/yolo/nava_yolov11_2026_02.pt &
 
 # Steering HUD overlay (shows HUD even without 3D cones)
 ros2 run kart_perception steering_hud --ros-args \

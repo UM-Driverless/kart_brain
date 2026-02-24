@@ -116,7 +116,7 @@ def generate_launch_description():
     # --- 3b. YOLO perception pipeline (when use_yolo=true) ---
     # Find YOLO weights relative to workspace
     weights_path = os.path.join(
-        os.path.expanduser("~"), "kart_sw", "models", "perception", "yolo", "best_adri.pt"
+        os.path.expanduser("~"), "kart_brain", "models", "perception", "yolo", "nava_yolov11_2026_02.pt"
     )
     try:
         pkg_perception = get_package_share_directory("kart_perception")
