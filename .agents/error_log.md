@@ -89,6 +89,32 @@ Tracks mistakes made during development and the prevention mechanisms added. Eve
 - Rule: Check the extra-index-url is reachable before relying on it: `curl -sI https://pypi.jetson-ai-lab.dev/`
 - Added to TODO.md as a blocked task
 
+## 2026-02-25 - cuBLAS fails on Jetson: pip cuBLAS 12.9 vs system CUDA 12.6
+**What happened:** `torch.matmul` and any operation using cuBLAS on the Orin crashed with `CUBLAS_STATUS_ALLOC_FAILED when calling cublasCreate(handle)`. Element-wise CUDA ops (add, mul) worked fine. Root cause: `pip install torch` from `pypi.jetson-ai-lab.io` pulled in `nvidia-cublas-cu12==12.9.1.4`, which is incompatible with the Jetson's system CUDA 12.6. The pip libs were placed first in `LD_LIBRARY_PATH`, shadowing the working system cuBLAS.
+**Prevention added:**
+- In `run_live.sh` and `run_live_3d.sh`, prepend `/usr/local/cuda-12.6/targets/aarch64-linux/lib` to `LD_LIBRARY_PATH` **before** pip NVIDIA libs, so system cuBLAS 12.6 is loaded instead of pip cuBLAS 12.9
+- Rule: **On Jetson, system CUDA libs must always precede pip-installed NVIDIA libs** in `LD_LIBRARY_PATH`. The pip packages are built for generic CUDA and may not work on Jetson's integrated GPU.
+- Rule: After installing torch on Jetson, always test: `python3 -c "import torch; a=torch.randn(4,4,device='cuda'); print(a@a)"`
+
+## 2026-02-25 - YOLOv5 torch.hub broken with torch 2.10
+**What happened:** `torch.hub.load("ultralytics/yolov5", "custom", ...)` downloads YOLOv5 source from GitHub. The cached AutoShape preprocessing code is incompatible with torch 2.10 — it passes raw numpy arrays to `conv2d()` instead of converting to tensors. Tried: numpy input, PIL input, manual tensor input — all failed differently. Clearing the hub cache didn't help.
+**Prevention added:**
+- Migrated `yolo_detector_node.py` to use the `ultralytics` pip package API (`from ultralytics import YOLO`) as primary, with torch.hub as fallback for legacy YOLOv5 weights
+- Switched default weights to YOLOv11 (`nava_yolov11_2026_02.pt`) which works natively with `ultralytics`
+- Rule: **Prefer the `ultralytics` pip package over `torch.hub.load`** for any YOLO inference. The pip package is actively maintained and handles device management, preprocessing, and model fusion internally.
+
+## 2026-02-24 - Multiple failed torch install attempts on Jetson Orin
+**What happened:** Original JetPack PyTorch 2.5.0a0 (NVIDIA build, CUDA working) was overwritten by CPU-only torch during dependency installation. Four recovery attempts failed:
+1. `pip install torch==2.5.0 --index-url nvidia.../jp/v60` — no wheels found
+2. NVIDIA Jetson wheel `torch-2.5.0a0+nv24.08` — CUDA works but torchvision 0.20 from PyPI overrides it with CPU torch
+3. `--no-deps` reinstall of NV wheel + torchvision 0.20 from PyPI — `torchvision::nms does not exist`
+4. `torch+torchvision from pypi.jetson-ai-lab.io/jp6/cu126` — torch 2.10 + torchvision 0.25, CUDA works, but YOLOv5 incompatible + cuBLAS version mismatch
+**Prevention added:**
+- Rule: **Never `pip install torch` without `--extra-index-url` pointing to the Jetson wheel index.** Always use `pypi.jetson-ai-lab.io/jp6/cu126` for JetPack 6 + CUDA 12.6.
+- Rule: **After installing torch, immediately verify**: `python3 -c "import torch; print(torch.__version__, torch.cuda.is_available()); a=torch.randn(2,2).cuda(); print(a@a)"`
+- Rule: **Pin `numpy<2`** after any torch install (pyzed and cv2 need numpy 1.x)
+- Rule: **Never install torchvision from PyPI on Jetson** — it pulls CPU-only torch as a dependency. Always install from the same Jetson index.
+
 ## 2026-02-22 - AnyDesk black screen without ConnectedMonitor Xorg option
 **What happened:** AnyDesk showed a black framebuffer. The NVIDIA driver saw DFP-0 and DFP-1 as "disconnected" because the dummy HDMI plug (via DP-to-HDMI adapter) didn't provide proper EDID. Without a connected monitor, Xorg had no screen.
 **Prevention added:**
