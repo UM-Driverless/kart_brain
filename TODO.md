@@ -89,6 +89,56 @@ sudo apt install ros-humble-ros-gz  # ~3-4 GB with all dependencies
 4. Wire ESP32 via USB serial (`/dev/ttyTHS1` or USB)
 5. Test sending steering + throttle commands via ROS2 topics
 
+## Document Hardware/Software Setup
+
+**Status:** Done
+
+**Context:** The [UM-Driverless repo](https://github.com/UM-Driverless/driverless) documents the same physical kart hardware but with a different software stack (Xavier NX, KVASER CAN, FSDS simulator). That info was used as reference to document our current setup (AGX Orin, ESP32/UART, Gazebo).
+
+**What was done:**
+1. UM-Driverless repo studied — hardware details extracted and adapted for our current setup
+2. Hardware overview table added to this repo's README
+3. Extensive docs in `kart_docs/`:
+    - [Assembly overview](https://um-driverless.github.io/kart_docs/assembly/) — hardware overview table with all subsystems
+    - [Getting Started](https://um-driverless.github.io/kart_docs/software/ros2/getting-started/) — full sim + real hardware setup guide
+    - [Architecture](https://um-driverless.github.io/kart_docs/software/ros2/architecture/) — system diagrams and topic maps
+    - [Orin Setup](https://um-driverless.github.io/kart_docs/assembly/electronics/orin-setup/) — complete flash + software install guide
+
+## Investigate Zombie/Stale Process Accumulation
+
+**Status:** Not started
+
+**Problem:** ROS2/Gazebo processes accumulate over time (zombie processes, orphaned nodes, leftover `ign gazebo` or `ros2` processes from previous runs). This clutters the system and can cause port conflicts or resource issues.
+
+**What's needed:**
+1. Investigate which processes are leaking — ROS2 nodes, Gazebo, bridge, YOLO, etc.
+2. Figure out why they aren't cleaned up on shutdown (missing signal handling? launch file issues?)
+3. Consider solutions: cleanup script on start, proper `on_exit` handlers in launch files, a wrapper script that kills stale processes before launching, or a systemd-style approach
+4. Implement and document whatever works
+
+## Create Reproducible Setup Script / Guide for Orin
+
+**Status:** Not started
+
+**Goal:** Make it easy to set up a fresh Orin (or reinstall) by creating either an install script, a detailed step-by-step doc, or both — written so an AI agent can follow it autonomously.
+
+**What to cover:**
+1. Flash JetPack / base OS
+2. Install ROS2 Humble + colcon
+3. Install Jetson-specific PyTorch + torchvision (CUDA wheels, numpy<2 pin)
+4. Install ZED SDK + ROS2 wrapper
+5. Clone and build `kart_brain` (including `ackermann_msgs` and other deps)
+6. Install Gazebo Fortress + `ros-humble-ros-gz` (optional, for sim)
+7. AnyDesk / remote access setup
+8. Any system config (udev rules for ESP32 serial, network, etc.)
+
+**Format options (pick when starting):**
+- `setup_orin.sh` script that does everything non-interactively
+- A detailed `.md` doc in `kart_docs/` or `.agents/` written for AI agents to follow
+- Both: script for the happy path, doc for context and troubleshooting
+
+**Reference:** Consolidate info already scattered across this TODO, `.agents/` docs, and `kart_docs/`.
+
 ## Long-Term
 
 - Explore YOLO acceleration via ONNX/TensorRT on Jetson

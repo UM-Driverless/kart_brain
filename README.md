@@ -6,6 +6,19 @@ ROS workspace for the UM-Driverless kart software stack.
 - **SSH**: `ssh orin` (WiFi, DHCP — IP may change)
 - **AnyDesk ID**: `721489674`
 
+## Hardware
+
+| Component | Details |
+|---|---|
+| **Chassis** | Tony Kart Extreme (late 90s, 30/32mm CrMo tubing) |
+| **Computer** | NVIDIA Jetson AGX Orin (JetPack 6.2.2, CUDA 12.6, 62 GB RAM) |
+| **Camera** | ZED 2 stereo (USB 3.0) |
+| **Microcontroller** | ESP32 "Kart Medulla" (UART 115200 baud) |
+| **Gamepad** | USB/Bluetooth (deadman switch on R1) |
+| **Actuators** | Steering motor (H-bridge) + throttle (DAC) via ESP32 |
+
+See [kart_docs](https://um-driverless.github.io/kart_docs/assembly/) for full hardware documentation, wiring diagrams, and setup guides.
+
 ## Install (ROS 2 Humble)
 Assumes Ubuntu 22.04 with ROS 2 Humble already installed and sourced.
 
