@@ -3,7 +3,7 @@ export LD_LIBRARY_PATH=/home/orin/.local/lib/python3.10/site-packages/nvidia/nvj
 export DISPLAY=:1
 export XAUTHORITY=/run/user/1000/gdm/Xauthority
 export PATH=/usr/local/cuda-12.6/bin:$PATH
-cd /mnt/data/kart_brain
+cd ~/kart_brain
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 
