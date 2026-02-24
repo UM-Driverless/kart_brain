@@ -60,6 +60,7 @@ class YoloDetectorNode(Node):
         )
 
         self._use_ultralytics = False
+        self._device = "cpu"
         self.model = self._load_model()
         self.class_names = self._get_class_names()
 
@@ -83,9 +84,9 @@ class YoloDetectorNode(Node):
         try:
             from ultralytics import YOLO
             model = YOLO(str(self.weights_path))
-            model.to(device)
+            self._device = device
             self._use_ultralytics = True
-            self.get_logger().info(f"Loaded model via ultralytics API (device: {device})")
+            self.get_logger().info(f"Loaded model via ultralytics API (will use device: {device})")
             return model
         except Exception as exc:
             self.get_logger().warn(f"ultralytics load failed ({exc}), trying torch.hub YOLOv5...")
@@ -129,6 +130,7 @@ class YoloDetectorNode(Node):
             imgsz=self.imgsz,
             conf=self.conf_threshold,
             iou=self.iou_threshold,
+            device=self._device,
             verbose=False,
         )
         detections = Detection2DArray()
