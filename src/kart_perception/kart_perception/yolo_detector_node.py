@@ -20,6 +20,16 @@ warnings.filterwarnings(
 )
 
 
+# Per-class colors (BGR) for debug image rendering
+CLASS_COLORS = {
+    "blue_cone": (255, 150, 0),
+    "yellow_cone": (0, 230, 255),
+    "orange_cone": (0, 140, 255),
+    "large_orange_cone": (0, 100, 255),
+}
+DEFAULT_COLOR = (200, 200, 200)
+
+
 class YoloDetectorNode(Node):
     def __init__(self) -> None:
         super().__init__("yolo_detector")
@@ -48,7 +58,7 @@ class YoloDetectorNode(Node):
         self.publisher = self.create_publisher(Detection2DArray, self.detections_topic, 10)
         self.debug_publisher = self.create_publisher(Image, self.debug_image_topic, 10)
         self.subscription = self.create_subscription(
-            Image, self.image_topic, self._on_image, 10
+            Image, self.image_topic, self._on_image, 1
         )
 
         self.model = self._load_model()
@@ -117,12 +127,21 @@ class YoloDetectorNode(Node):
         self.publisher.publish(detections)
 
         if self.publish_debug_image:
-            rendered = results.render()
-            if rendered:
-                debug_bgr = cv2.cvtColor(rendered[0], cv2.COLOR_RGB2BGR)
-                debug_msg = self.bridge.cv2_to_imgmsg(debug_bgr, encoding="bgr8")
-                debug_msg.header = msg.header
-                self.debug_publisher.publish(debug_msg)
+            debug_img = frame_bgr.copy()
+            for det in results.xyxy[0].tolist():
+                x1, y1, x2, y2, conf, cls_id = det
+                name = str(self.class_names[int(cls_id)]) if self.class_names else str(int(cls_id))
+                color = CLASS_COLORS.get(name, DEFAULT_COLOR)
+                p1, p2 = (int(x1), int(y1)), (int(x2), int(y2))
+                cv2.rectangle(debug_img, p1, p2, color, 2)
+                label = f"{name} {conf:.2f}"
+                (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+                cv2.rectangle(debug_img, (p1[0], p1[1] - th - 6), (p1[0] + tw + 4, p1[1]), color, -1)
+                cv2.putText(debug_img, label, (p1[0] + 2, p1[1] - 4),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
+            debug_msg = self.bridge.cv2_to_imgmsg(debug_img, encoding="bgr8")
+            debug_msg.header = msg.header
+            self.debug_publisher.publish(debug_msg)
 
 
 def main() -> None:

@@ -56,6 +56,7 @@ class SteeringHudNode(Node):
         self.latest_annotated = None
         self._fps_prev_time = time.monotonic()
         self._fps = 0.0
+        self._last_synced_time = 0.0
 
         # Publisher
         self.pub = self.create_publisher(
@@ -123,6 +124,7 @@ class SteeringHudNode(Node):
             self._fps = 0.9 * self._fps + 0.1 * instant
 
     def _on_synced(self, img_msg: Image, cones_msg: Detection3DArray):
+        self._last_synced_time = time.monotonic()
         self._update_fps()
         img = self.bridge.imgmsg_to_cv2(img_msg, desired_encoding="bgr8")
         self.latest_annotated = img.copy()
@@ -211,8 +213,11 @@ class SteeringHudNode(Node):
         self.pub.publish(out_msg)
 
     def _fallback(self):
-        """Republish latest annotated image with just the steering gauge."""
+        """Republish latest annotated image with just the steering gauge.
+        Only fires when no synced frames have arrived recently."""
         if self.latest_annotated is None:
+            return
+        if time.monotonic() - self._last_synced_time < 1.0:
             return
         img = self.latest_annotated.copy()
         self._draw_gauge(img, self.latest_cmd.angular.z)
