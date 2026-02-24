@@ -128,17 +128,21 @@ class YoloDetectorNode(Node):
 
         if self.publish_debug_image:
             debug_img = frame_bgr.copy()
+            # Two-pass: boxes first, then labels on top (prevents overlap)
+            parsed = []
             for det in results.xyxy[0].tolist():
                 x1, y1, x2, y2, conf, cls_id = det
                 name = str(self.class_names[int(cls_id)]) if self.class_names else str(int(cls_id))
                 color = CLASS_COLORS.get(name, DEFAULT_COLOR)
                 p1, p2 = (int(x1), int(y1)), (int(x2), int(y2))
-                cv2.rectangle(debug_img, p1, p2, color, 2)
-                label = f"{name} {conf:.2f}"
-                (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
-                cv2.rectangle(debug_img, (p1[0], p1[1] - th - 6), (p1[0] + tw + 4, p1[1]), color, -1)
-                cv2.putText(debug_img, label, (p1[0] + 2, p1[1] - 4),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 1, cv2.LINE_AA)
+                parsed.append((p1, p2, color, name, conf))
+                cv2.rectangle(debug_img, p1, p2, color, 3)
+            for p1, _, color, name, conf in parsed:
+                label = f"{name.replace('_cone', '')} {conf:.0%}"
+                (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+                cv2.rectangle(debug_img, (p1[0], p1[1] - th - 8), (p1[0] + tw + 6, p1[1]), color, -1)
+                cv2.putText(debug_img, label, (p1[0] + 3, p1[1] - 5),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2, cv2.LINE_AA)
             debug_msg = self.bridge.cv2_to_imgmsg(debug_img, encoding="bgr8")
             debug_msg.header = msg.header
             self.debug_publisher.publish(debug_msg)
