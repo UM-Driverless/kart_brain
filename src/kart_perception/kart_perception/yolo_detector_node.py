@@ -87,6 +87,7 @@ class YoloDetectorNode(Node):
             )
             model.conf = self.conf_threshold
             model.iou = self.iou_threshold
+            model.imgsz = self.imgsz
             device = self.device
             if not device:
                 device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -103,7 +104,7 @@ class YoloDetectorNode(Node):
         frame_bgr = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
 
-        results = self.model(frame_rgb, size=self.imgsz)
+        results = self.model(frame_rgb)
         detections = Detection2DArray()
         detections.header = msg.header
 
