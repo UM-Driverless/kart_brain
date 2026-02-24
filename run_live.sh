@@ -1,5 +1,5 @@
 #!/bin/bash
-export LD_LIBRARY_PATH=/home/orin/.local/lib/python3.10/site-packages/nvidia/nvjitlink/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/home/orin/.local/lib/python3.10/site-packages/nvidia/nvjitlink/lib:/home/orin/.local/lib/python3.10/site-packages/nvidia/cusparselt/lib:$LD_LIBRARY_PATH
 export DISPLAY=:1
 export XAUTHORITY=/run/user/1000/gdm/Xauthority
 export PATH=/usr/local/cuda-12.6/bin:$PATH
