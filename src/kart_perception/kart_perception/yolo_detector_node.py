@@ -89,7 +89,7 @@ class YoloDetectorNode(Node):
             model.iou = self.iou_threshold
             device = self.device
             if not device:
-                device = "0" if torch.cuda.is_available() else "cpu"
+                device = "cuda:0" if torch.cuda.is_available() else "cpu"
             self.get_logger().info(f"YOLO device: {device} (CUDA available: {torch.cuda.is_available()})")
             model.to(device)
             return model
