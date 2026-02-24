@@ -1,5 +1,6 @@
 #!/bin/bash
-# Full 3D pipeline: ZED native → YOLO → depth localizer → cone follower → steering HUD
+# Live pipeline: ZED (webcam mode) → YOLO → HUD
+# For full 3D (depth + cone follower), the ZED ROS2 wrapper is needed.
 # Include all pip-installed NVIDIA libs (nvjitlink, cusparselt, cudss, cublas, etc.)
 NVIDIA_LIBS=$(find ~/.local/lib/python3.10/site-packages/nvidia -name "lib" -type d 2>/dev/null | tr "\n" ":")
 export LD_LIBRARY_PATH="${NVIDIA_LIBS}${LD_LIBRARY_PATH}"
@@ -10,34 +11,23 @@ cd ~/kart_brain
 source /opt/ros/humble/setup.bash
 source install/setup.bash
 
-# ZED wrapper (publishes RGB, depth, camera_info natively)
-ros2 launch zed_wrapper zed_camera.launch.py camera_model:=zed2 &
+# Image source (ZED as webcam, left eye only)
+ros2 run kart_perception image_source --ros-args \
+  -p source:=/dev/video0 \
+  -p stereo_crop:=true \
+  -p publish_rate:=15.0 \
+  -p image_topic:=/image_raw &
 
-# YOLO detector (on ZED RGB)
+# YOLO detector
 ros2 run kart_perception yolo_detector --ros-args \
-  -p image_topic:=/zed/zed_node/rgb/image_rect_color \
+  -p image_topic:=/image_raw \
   -p detections_topic:=/perception/cones_2d \
   -p debug_image_topic:=/perception/yolo/annotated \
   -p weights_path:=models/perception/yolo/best_adri.pt &
 
-# 3D cone localizer (depth + 2D detections → 3D)
-ros2 run kart_perception cone_depth_localizer --ros-args \
-  -p detections_topic:=/perception/cones_2d \
-  -p depth_topic:=/zed/zed_node/depth/depth_registered \
-  -p camera_info_topic:=/zed/zed_node/rgb/camera_info \
-  -p output_topic:=/perception/cones_3d &
-
-# Cone follower (steering controller)
-ros2 run kart_sim cone_follower --ros-args \
-  -p detections_topic:=/perception/cones_3d \
-  -p cmd_vel_topic:=/kart/cmd_vel &
-
-# Steering HUD overlay
+# Steering HUD overlay (shows HUD even without 3D cones)
 ros2 run kart_perception steering_hud --ros-args \
   -p annotated_topic:=/perception/yolo/annotated \
-  -p cones_3d_topic:=/perception/cones_3d \
-  -p cmd_vel_topic:=/kart/cmd_vel \
-  -p camera_info_topic:=/zed/zed_node/rgb/camera_info \
   -p output_topic:=/perception/hud &
 
 sleep 30
