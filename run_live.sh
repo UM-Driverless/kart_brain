@@ -1,5 +1,7 @@
 #!/bin/bash
-export LD_LIBRARY_PATH=/home/orin/.local/lib/python3.10/site-packages/nvidia/nvjitlink/lib:/home/orin/.local/lib/python3.10/site-packages/nvidia/cusparselt/lib:$LD_LIBRARY_PATH
+# Include all pip-installed NVIDIA libs (nvjitlink, cusparselt, cudss, cublas, etc.)
+NVIDIA_LIBS=$(find ~/.local/lib/python3.10/site-packages/nvidia -name "lib" -type d 2>/dev/null | tr "\n" ":")
+export LD_LIBRARY_PATH="${NVIDIA_LIBS}${LD_LIBRARY_PATH}"
 export DISPLAY=:1
 export XAUTHORITY=/run/user/1000/gdm/Xauthority
 export PATH=/usr/local/cuda-12.6/bin:$PATH
