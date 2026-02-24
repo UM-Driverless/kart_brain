@@ -101,13 +101,11 @@ class YoloDetectorNode(Node):
     def _on_image(self, msg: Image) -> None:
         if self.model is None:
             return
-        import torch
+        from PIL import Image as PILImage
         frame_bgr = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
         frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-        # Convert to tensor for torch 2.10+ compatibility (AutoShape no longer handles numpy)
-        device = next(self.model.parameters()).device
-        frame_t = torch.from_numpy(frame_rgb).permute(2, 0, 1).unsqueeze(0).float().to(device) / 255.0
-        results = self.model(frame_t)
+        # Pass PIL Image: AutoShape handles resize/letterbox correctly (numpy broken in torch 2.10)
+        results = self.model(PILImage.fromarray(frame_rgb))
         detections = Detection2DArray()
         detections.header = msg.header
 
