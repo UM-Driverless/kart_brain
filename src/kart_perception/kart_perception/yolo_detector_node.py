@@ -31,7 +31,7 @@ class YoloDetectorNode(Node):
         self.declare_parameter("conf_threshold", 0.25)
         self.declare_parameter("iou_threshold", 0.45)
         self.declare_parameter("imgsz", 640)
-        self.declare_parameter("device", "cpu")
+        self.declare_parameter("device", "0")
         self.declare_parameter("publish_debug_image", True)
 
         self.image_topic = str(self.get_parameter("image_topic").value)

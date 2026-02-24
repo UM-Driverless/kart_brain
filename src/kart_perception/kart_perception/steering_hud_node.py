@@ -54,8 +54,7 @@ class SteeringHudNode(Node):
         self.fx = self.fy = self.cx = self.cy = None
         self.camera_info_ready = False
         self.latest_annotated = None
-        self._fps_last_time = time.monotonic()
-        self._fps_count = 0
+        self._fps_prev_time = time.monotonic()
         self._fps = 0.0
 
         # Publisher
@@ -116,13 +115,12 @@ class SteeringHudNode(Node):
             )
 
     def _update_fps(self):
-        self._fps_count += 1
         now = time.monotonic()
-        elapsed = now - self._fps_last_time
-        if elapsed >= 1.0:
-            self._fps = self._fps_count / elapsed
-            self._fps_count = 0
-            self._fps_last_time = now
+        dt = now - self._fps_prev_time
+        self._fps_prev_time = now
+        if dt > 0:
+            instant = 1.0 / dt
+            self._fps = 0.9 * self._fps + 0.1 * instant
 
     def _on_synced(self, img_msg: Image, cones_msg: Detection3DArray):
         self._update_fps()
