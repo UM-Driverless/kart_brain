@@ -2,6 +2,10 @@
 
 ROS workspace for the UM-Driverless kart software stack.
 
+## Jetson Orin Access
+- **SSH**: `ssh orin` (WiFi, DHCP — IP may change)
+- **AnyDesk ID**: `721489674`
+
 ## Install (ROS 2 Humble)
 Assumes Ubuntu 22.04 with ROS 2 Humble already installed and sourced.
 
