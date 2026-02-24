@@ -1,7 +1,8 @@
 #!/bin/bash
-# Include all pip-installed NVIDIA libs (nvjitlink, cusparselt, cudss, cublas, etc.)
+# System CUDA libs MUST come before pip NVIDIA libs (pip cuBLAS 12.9 is
+# incompatible with Jetson CUDA 12.6; system cuBLAS 12.6 works).
 NVIDIA_LIBS=$(find ~/.local/lib/python3.10/site-packages/nvidia -name "lib" -type d 2>/dev/null | tr "\n" ":")
-export LD_LIBRARY_PATH="${NVIDIA_LIBS}${LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="/usr/local/cuda-12.6/targets/aarch64-linux/lib:${NVIDIA_LIBS}${LD_LIBRARY_PATH}"
 export DISPLAY=:1
 export XAUTHORITY=/run/user/1000/gdm/Xauthority
 export PATH=/usr/local/cuda-12.6/bin:$PATH
