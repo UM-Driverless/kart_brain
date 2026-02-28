@@ -10,14 +10,6 @@
           </mesh>
         </geometry>
       </visual>
-      <collision name="collision">
-        <geometry>
-          <cylinder>
-            <radius>0.114</radius>
-            <length>0.325</length>
-          </cylinder>
-        </geometry>
-      </collision>
     </link>
   </model>
 </sdf>
