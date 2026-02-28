@@ -155,6 +155,12 @@ class ConeFollowerNode(Node):
         else:
             steer, speed = self._control_geometric(cones)
 
+        # Safety: if no cones visible, slow down and keep last steer
+        # (don't hard-stop — cones may reappear after a curve transition)
+        if not cones:
+            speed = self.min_speed
+            steer = self._last_steer
+
         cmd = Twist()
         cmd.angular.z = steer
         cmd.linear.x = speed

@@ -28,8 +28,9 @@ def main():
                         help="Comma-separated controller types: "
                              "geometric, neural, neural_v2")
     parser.add_argument("--fitness", type=str, default="v1",
-                        choices=["v1", "v2"],
-                        help="v1: distance+laps, v2: lap-time based")
+                        choices=["v1", "v2", "v3"],
+                        help="v1: distance+laps, v2: lap-time, "
+                             "v3: track-keeping (nonlinear CTE penalty)")
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
@@ -80,8 +81,11 @@ def main():
         print(f"Saved {name} → {path}")
         print(f"  fitness={ga.best_fitness:.1f}  "
               f"dist={result['distance']:.1f}m  laps={result['laps']}  "
-              f"avg_cte={result['avg_cte']:.2f}m  avg_speed={result['avg_speed']:.1f}m/s  "
-              f"time={result['time']:.1f}s")
+              f"avg_cte={result['avg_cte']:.2f}m  max_cte={result['max_cte']:.2f}m  "
+              f"avg_speed={result['avg_speed']:.1f}m/s  "
+              f"time={result['time']:.1f}s"
+              + (f"  cte_pen={result['cte_penalty']:.1f}"
+                 if result.get('cte_penalty') else ""))
         if name == "geometric":
             g = ga.best_genes
             print(f"  genes: gain={g[0]:.3f} max_steer={g[1]:.3f} "
