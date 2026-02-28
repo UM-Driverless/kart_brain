@@ -77,6 +77,7 @@ def generate_launch_description():
         arguments=[
             "/world/fs_track/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock",
             "/model/kart/odometry@nav_msgs/msg/Odometry[ignition.msgs.Odometry",
+            "/model/kart/odom_gt@nav_msgs/msg/Odometry[ignition.msgs.Odometry",
             "/kart/cmd_vel@geometry_msgs/msg/Twist]ignition.msgs.Twist",
             "/kart/rgbd/image@sensor_msgs/msg/Image[ignition.msgs.Image",
             "/kart/rgbd/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image",

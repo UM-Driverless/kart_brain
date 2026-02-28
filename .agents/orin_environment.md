@@ -34,7 +34,8 @@ ssh orin 'echo "0" | sudo -S <command>'
 | CUDA | 12.6 (via nvidia-jetpack) |
 | cuDNN | 9.3 (via nvidia-jetpack) |
 | TensorRT | 10.3 (via nvidia-jetpack) |
-| PyTorch | 2.10.0+cpu (**CPU-only** — Jetson AI Lab index was down, see TODO.md) |
+| PyTorch | 2.10.0 (CUDA works with LD_LIBRARY_PATH set — see Environment Setup) |
+| Gazebo | Fortress 6.16.0 (`ros-humble-ros-gz`) |
 | ZED SDK | 4.2 (`/usr/local/zed/`, L4T 36.4 build, compatible with L4T 36.5) |
 | Python | 3.10.12 (system) |
 | numpy | 1.26.4 (must be <2, cv2 compiled against numpy 1.x) |
@@ -42,21 +43,27 @@ ssh orin 'echo "0" | sudo -S <command>'
 | AnyDesk | Installed |
 
 ## Environment Setup
-```bash
-# Required before running anything with PyTorch/YOLO
-export LD_LIBRARY_PATH=/home/orin/.local/lib/python3.10/site-packages/nvidia/nvjitlink/lib:$LD_LIBRARY_PATH
 
-# ROS 2 workspace
-cd ~/kart_brain
-source /opt/ros/humble/setup.bash && source install/setup.bash
+The following are already in `~/.bashrc` and sourced automatically on login/terminal:
+```bash
+source /opt/ros/humble/setup.bash
+source ~/kart_brain/install/setup.bash
+export IGN_GAZEBO_RESOURCE_PATH=$(ros2 pkg prefix kart_sim 2>/dev/null)/share/kart_sim/models
 ```
+
+**Not in `.bashrc`** — must be set manually when running PyTorch/YOLO (the `run_live_3d.sh` script handles this):
+```bash
+export LD_LIBRARY_PATH=/usr/local/cuda-12.6/targets/aarch64-linux/lib:$(find ~/.local/lib/python3.10/site-packages/nvidia -name "lib" -type d 2>/dev/null | tr "\n" ":"):$LD_LIBRARY_PATH
+```
+
+**Note:** After `colcon build`, you need to re-source `install/setup.bash` (or open a new terminal) for changes to take effect.
 
 ## Workspace
 | Path | Description |
 |---|---|
 | `/home/orin/kart_brain` | Main ROS2 workspace (this repo) |
 | `~/Desktop/KART_SW` | Old copy of kart_sw |
-| `~/Desktop/kart_medulla` | ESP32 firmware (PlatformIO) |
+| `~/Desktop/kart_medulla` | ESP32 firmware (PlatformIO) — **not present**, needs cloning from https://github.com/UM-Driverless/kart_medulla |
 
 ## ZED Camera
 - USB device: `2b03:f780 STEREOLABS ZED 2`

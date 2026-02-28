@@ -131,14 +131,14 @@ class PerfectPerceptionNode(Node):
         # TF broadcaster for camera frame
         self.tf_broadcaster = TransformBroadcaster(self)
 
-        # Subscribe to kart odometry (from Gazebo bridge)
+        # Subscribe to ground-truth odometry (world frame, no drift)
         odom_qos = QoSProfile(
             depth=10,
             reliability=ReliabilityPolicy.BEST_EFFORT,
             durability=DurabilityPolicy.VOLATILE,
         )
         self.odom_sub = self.create_subscription(
-            Odometry, "/model/kart/odometry", self._on_odom, odom_qos
+            Odometry, "/model/kart/odom_gt", self._on_odom, odom_qos
         )
 
         # Current kart pose
@@ -151,20 +151,13 @@ class PerfectPerceptionNode(Node):
         self.timer = self.create_timer(1.0 / publish_rate, self._publish)
 
     def _on_odom(self, msg: Odometry):
-        # Odom is in the kart's start frame — transform to world frame
-        odom_x = msg.pose.pose.position.x
-        odom_y = msg.pose.pose.position.y
+        # Ground-truth odom is already in world frame
+        self.kart_x = msg.pose.pose.position.x
+        self.kart_y = msg.pose.pose.position.y
         q = msg.pose.pose.orientation
         siny_cosp = 2.0 * (q.w * q.z + q.x * q.y)
         cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z)
-        odom_yaw = math.atan2(siny_cosp, cosy_cosp)
-
-        # Transform odom pose to world frame
-        cos_s = math.cos(self.start_yaw)
-        sin_s = math.sin(self.start_yaw)
-        self.kart_x = self.start_x + odom_x * cos_s - odom_y * sin_s
-        self.kart_y = self.start_y + odom_x * sin_s + odom_y * cos_s
-        self.kart_yaw = self.start_yaw + odom_yaw
+        self.kart_yaw = math.atan2(siny_cosp, cosy_cosp)
         self.got_odom = True
 
     def _publish(self):
