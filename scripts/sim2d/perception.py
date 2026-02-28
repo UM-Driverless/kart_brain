@@ -4,7 +4,7 @@ import numpy as np
 from kart_model import KartState
 
 CAMERA_OFFSET = 0.55          # m forward of chassis center
-FOV_HALF = np.radians(40)     # ±40° = 80° total
+FOV_HALF = np.radians(60)     # ±60° = 120° total
 RANGE_MIN = 0.5               # m
 RANGE_MAX = 15.0              # m
 

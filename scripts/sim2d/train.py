@@ -31,6 +31,8 @@ def main():
                         choices=["v1", "v2", "v3"],
                         help="v1: distance+laps, v2: lap-time, "
                              "v3: track-keeping (nonlinear CTE penalty)")
+    parser.add_argument("--seed", type=str, default="",
+                        help="Path to JSON weights to seed population with")
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
@@ -39,8 +41,19 @@ def main():
     gas = {}
     for name in names:
         cls = CONTROLLER_MAP[name]
-        gas[name] = GeneticAlgorithm(cls, pop_size=args.pop_size,
-                                     fitness_mode=args.fitness)
+        ga = GeneticAlgorithm(cls, pop_size=args.pop_size,
+                              fitness_mode=args.fitness)
+        if args.seed:
+            import numpy as np
+            with open(args.seed) as f:
+                seed_data = json.load(f)
+            seed_genes = np.array(seed_data["genes"], dtype=np.float64)
+            # Inject seed into first few slots with small mutations
+            ga.population[0] = seed_genes.copy()
+            for i in range(1, min(10, args.pop_size)):
+                ga.population[i] = seed_genes + np.random.randn(len(seed_genes)) * 0.05
+            print(f"  Seeded {name} from {args.seed} (fitness={seed_data.get('fitness', '?')})")
+        gas[name] = ga
 
     print(f"Training {list(gas.keys())} | "
           f"generations={args.generations}  pop={args.pop_size}  "

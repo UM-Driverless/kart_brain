@@ -146,7 +146,7 @@ class ConeFollowerNode(Node):
             if dist > 15.0:
                 continue
             angle = abs(math.atan2(left, fwd))
-            if angle > 0.6981:  # ±40° in radians
+            if angle > 1.0472:  # ±60° in radians
                 continue
             cones.append((class_id, fwd, left))
 
@@ -243,6 +243,7 @@ class ConeFollowerNode(Node):
 
         steer = float(np.tanh(out[0])) * self._nn_max_steer
         speed = float(1.0 / (1.0 + np.exp(-out[1]))) * self._nn_max_speed
+        speed = max(self.min_speed, min(self.max_speed, speed))
         self._current_speed = speed  # track for next iteration
 
         self._last_steer = steer

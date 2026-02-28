@@ -89,7 +89,7 @@ def generate_launch_description():
             "/world/fs_track/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock",
             "/model/kart/odometry@nav_msgs/msg/Odometry[ignition.msgs.Odometry",
             "/model/kart/odom_gt@nav_msgs/msg/Odometry[ignition.msgs.Odometry",
-            "/kart/cmd_vel@geometry_msgs/msg/Twist]ignition.msgs.Twist",
+            "/kart/vel_cmd@geometry_msgs/msg/Twist]ignition.msgs.Twist",
             "/kart/rgbd/image@sensor_msgs/msg/Image[ignition.msgs.Image",
             "/kart/rgbd/depth_image@sensor_msgs/msg/Image[ignition.msgs.Image",
             "/kart/rgbd/camera_info@sensor_msgs/msg/CameraInfo[ignition.msgs.CameraInfo",
@@ -212,6 +212,14 @@ def generate_launch_description():
     except Exception:
         marker_viz = ExecuteProcess(cmd=["true"], output="log")
 
+    # --- 6. Ackermann-to-velocity converter (steer angle → yaw rate) ---
+    ackermann_to_vel = Node(
+        package="kart_sim",
+        executable="ackermann_to_vel.py",
+        name="ackermann_to_vel",
+        output="screen",
+    )
+
     return LaunchDescription(
         [
             use_yolo_arg,
@@ -226,5 +234,6 @@ def generate_launch_description():
             TimerAction(period=8.0, actions=[perception_launch]),
             TimerAction(period=6.0, actions=[cone_follower]),
             TimerAction(period=5.0, actions=[marker_viz]),
+            TimerAction(period=4.0, actions=[ackermann_to_vel]),
         ]
     )

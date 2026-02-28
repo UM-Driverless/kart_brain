@@ -13,6 +13,8 @@ install(PROGRAMS
   scripts/capture_frames.py
   scripts/evaluate_perception.py
   scripts/camera_info_fix_node.py
+  scripts/ign_cmd_relay.py
+  scripts/ackermann_to_vel.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

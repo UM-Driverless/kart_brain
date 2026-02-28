@@ -162,6 +162,15 @@ class PerfectPerceptionNode(Node):
 
     def _publish(self):
         if not self.got_odom or not self.cones:
+            self.get_logger().info(
+                f"Skipping: got_odom={self.got_odom} cones={len(self.cones)}",
+                throttle_duration_sec=2.0,
+            )
+            # Still publish empty array so controller knows we're alive
+            out = Detection3DArray()
+            out.header.stamp = self.get_clock().now().to_msg()
+            out.header.frame_id = self.camera_frame
+            self.pub.publish(out)
             return
 
         now = self.get_clock().now().to_msg()
@@ -225,6 +234,10 @@ class PerfectPerceptionNode(Node):
             out.detections.append(det)
 
         self.pub.publish(out)
+        self.get_logger().info(
+            f"Published {len(out.detections)} cones  kart=({self.kart_x:.1f},{self.kart_y:.1f}) yaw={math.degrees(self.kart_yaw):.0f}°",
+            throttle_duration_sec=2.0,
+        )
 
         # Broadcast TF: odom -> base_link -> camera_link
         t = TransformStamped()
