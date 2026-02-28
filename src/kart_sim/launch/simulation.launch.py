@@ -43,6 +43,16 @@ def generate_launch_description():
         default_value="false",
         description="Launch Gazebo with GUI (for AnyDesk/display).",
     )
+    controller_arg = DeclareLaunchArgument(
+        "controller",
+        default_value="geometric",
+        description="Controller type: 'geometric' or 'neural'.",
+    )
+    weights_json_arg = DeclareLaunchArgument(
+        "weights_json",
+        default_value="",
+        description="Path to neural-net weights JSON (from sim2d GA trainer).",
+    )
 
     # --- 1. Gazebo (headless by default, GUI with gui:=true) ---
     gazebo_headless = ExecuteProcess(
@@ -169,6 +179,8 @@ def generate_launch_description():
                 "use_sim_time": False,
                 "detections_topic": "/perception/cones_3d",
                 "cmd_vel_topic": "/kart/cmd_vel",
+                "controller_type": LaunchConfiguration("controller"),
+                "weights_json": LaunchConfiguration("weights_json"),
                 "max_speed": 2.0,
                 "min_speed": 0.5,
                 "steering_gain": 1.0,
@@ -203,6 +215,8 @@ def generate_launch_description():
         [
             use_yolo_arg,
             gui_arg,
+            controller_arg,
+            weights_json_arg,
             gazebo_headless,
             gazebo_gui,
             TimerAction(period=3.0, actions=[bridge]),
