@@ -131,6 +131,18 @@ Tracks mistakes made during development and the prevention mechanisms added. Eve
 - Added explicit note in `CLAUDE.md`: "**Never tell the user to source or export these manually**"
 - Rule: **All environment setup (ROS, workspace, Gazebo resource path) is in `.bashrc` on every machine.** Just run commands directly — never prepend source/export boilerplate.
 
+## 2026-02-28 - Wrote to wrong file instead of asking where it goes
+**What happened:** User asked to add a FAQ entry to "kart_docs". Instead of recognizing this as the separate `~/repos/kart_docs/` repository (which has a `docs/faq.md`), I assumed the file didn't exist and wrote the content to `.agents/README.md` in `kart_brain` — the wrong repo entirely. I should have asked the user for the path or searched for the `kart_docs` repo.
+**Prevention added:**
+- Rule: **If the user references a file or location you don't recognize, ASK — don't assume and write to a different location.** Writing to the wrong file is worse than asking a clarifying question.
+- Rule: **The `kart_docs` repo lives at `~/repos/kart_docs/`** and has its own `docs/faq.md`. It is a separate repo from `kart_brain`.
+
+## 2026-02-28 - Created files but didn't rebuild workspace before telling user to launch
+**What happened:** Created `hairpin_track.sdf` and updated `simulation.launch.py` on the Mac, then told the user the launch commands without rebuilding the workspace. The `install(DIRECTORY worlds/ ...)` in CMakeLists only copies files at build time, so the installed share directory still had the old files. User launched and got the old oval track.
+**Prevention added:**
+- Rule: **After creating or modifying any file under `src/`, scp the files to the VM and rebuild there.** Files in `src/` are not used directly — only the installed copies in `install/` are. Don't just tell the user — do it yourself via SSH.
+- Rule: **Development happens on Mac, but Gazebo runs on the VM.** Use `scp` to copy changed files, then `ssh utm "source /opt/ros/humble/setup.bash && cd ~/kart_brain && colcon build --packages-select <pkg>"` to rebuild. Note: `bash -lc` does NOT source `.bashrc` on the VM (non-interactive guard), so always source ROS explicitly in SSH commands.
+
 ## 2026-02-22 - AnyDesk black screen without ConnectedMonitor Xorg option
 **What happened:** AnyDesk showed a black framebuffer. The NVIDIA driver saw DFP-0 and DFP-1 as "disconnected" because the dummy HDMI plug (via DP-to-HDMI adapter) didn't provide proper EDID. Without a connected monitor, Xorg had no screen.
 **Prevention added:**

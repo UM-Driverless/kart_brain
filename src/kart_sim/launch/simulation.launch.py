@@ -9,6 +9,8 @@ Starts:
 6. CameraInfo fix node (when use_yolo=true)
 
 Launch arguments:
+    track:=oval      -> Oval track (default)
+    track:=hairpin   -> Hairpin track
     use_yolo:=true   -> Launch YOLO pipeline (yolo_detector + cone_depth_localizer)
     use_yolo:=false  -> Launch perfect perception (ground truth from SDF) [default]
 """
@@ -20,6 +22,7 @@ from launch.actions import (
     DeclareLaunchArgument,
     ExecuteProcess,
     IncludeLaunchDescription,
+    OpaqueFunction,
     TimerAction,
 )
 from launch.conditions import IfCondition, UnlessCondition
@@ -27,33 +30,32 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
+# Track configs: world_file_basename, world_name, (start_x, start_y, start_yaw)
+_TRACKS = {
+    "oval": ("fs_track.sdf", "fs_track", 20.0, 0.0, 1.5708),
+    "hairpin": ("hairpin_track.sdf", "hairpin_track", 16.0, 5.0, 1.5708),
+}
 
-def generate_launch_description():
+
+def _launch_setup(context):
     pkg_kart_sim = get_package_share_directory("kart_sim")
-    world_file = os.path.join(pkg_kart_sim, "worlds", "fs_track.sdf")
     model_path = os.path.join(pkg_kart_sim, "models")
 
-    use_yolo_arg = DeclareLaunchArgument(
-        "use_yolo",
-        default_value="false",
-        description="Use YOLO perception instead of perfect perception.",
+    track_name = context.launch_configurations["track"]
+    if track_name not in _TRACKS:
+        raise RuntimeError(
+            f"Unknown track '{track_name}'. Choose from: {list(_TRACKS.keys())}"
+        )
+    sdf_basename, world_name, start_x, start_y, start_yaw = _TRACKS[track_name]
+    world_file = os.path.join(pkg_kart_sim, "worlds", sdf_basename)
+
+    use_yolo = context.launch_configurations.get("use_yolo", "false")
+    gui = context.launch_configurations.get("gui", "false")
+    controller_type = context.launch_configurations.get("controller", "neural_v2")
+    default_weights = os.path.join(
+        pkg_kart_sim, "config", "neural_v2_weights.json"
     )
-    gui_arg = DeclareLaunchArgument(
-        "gui",
-        default_value="false",
-        description="Launch Gazebo with GUI (for AnyDesk/display).",
-    )
-    default_weights = os.path.join(pkg_kart_sim, "config", "neural_v2_weights.json")
-    controller_arg = DeclareLaunchArgument(
-        "controller",
-        default_value="neural_v2",
-        description="Controller type: 'geometric', 'neural', or 'neural_v2'.",
-    )
-    weights_json_arg = DeclareLaunchArgument(
-        "weights_json",
-        default_value=default_weights,
-        description="Path to neural-net weights JSON (from sim2d GA trainer).",
-    )
+    weights_json = context.launch_configurations.get("weights_json", default_weights)
 
     # --- 1. Gazebo (headless by default, GUI with gui:=true) ---
     gazebo_headless = ExecuteProcess(
@@ -69,7 +71,7 @@ def generate_launch_description():
     )
     gazebo_gui = ExecuteProcess(
         cmd=[
-            "ign", "gazebo", "-r",
+            "ign", "gazebo",
             world_file,
         ],
         output="screen",
@@ -80,13 +82,12 @@ def generate_launch_description():
     )
 
     # --- 2. ros_gz_bridge ---
-    # CameraInfo is remapped to _raw; the camera_info_fix_node corrects
-    # the intrinsics and republishes to the final topic.
+    clock_topic = f"/world/{world_name}/clock"
     bridge = Node(
         package="ros_gz_bridge",
         executable="parameter_bridge",
         arguments=[
-            "/world/fs_track/clock@rosgraph_msgs/msg/Clock[ignition.msgs.Clock",
+            f"{clock_topic}@rosgraph_msgs/msg/Clock[ignition.msgs.Clock",
             "/model/kart/odometry@nav_msgs/msg/Odometry[ignition.msgs.Odometry",
             "/model/kart/odom_gt@nav_msgs/msg/Odometry[ignition.msgs.Odometry",
             "/kart/vel_cmd@geometry_msgs/msg/Twist]ignition.msgs.Twist",
@@ -98,7 +99,7 @@ def generate_launch_description():
             ("/kart/rgbd/image", "/zed/zed_node/rgb/image_rect_color"),
             ("/kart/rgbd/depth_image", "/zed/zed_node/depth/depth_registered"),
             ("/kart/rgbd/camera_info", "/zed/zed_node/rgb/camera_info_raw"),
-            ("/world/fs_track/clock", "/clock"),
+            (clock_topic, "/clock"),
         ],
         parameters=[{"use_sim_time": True}],
         output="screen",
@@ -134,18 +135,18 @@ def generate_launch_description():
                 "max_range": 20.0,
                 "fov_deg": 120.0,
                 "publish_rate": 10.0,
-                "kart_start_x": 20.0,
-                "kart_start_y": 0.0,
-                "kart_start_yaw": 1.5708,
+                "kart_start_x": start_x,
+                "kart_start_y": start_y,
+                "kart_start_yaw": start_yaw,
             }
         ],
         condition=UnlessCondition(LaunchConfiguration("use_yolo")),
     )
 
     # --- 3b. YOLO perception pipeline (when use_yolo=true) ---
-    # Find YOLO weights relative to workspace
     weights_path = os.path.join(
-        os.path.expanduser("~"), "kart_brain", "models", "perception", "yolo", "nava_yolov11_2026_02.pt"
+        os.path.expanduser("~"), "kart_brain", "models", "perception", "yolo",
+        "nava_yolov11_2026_02.pt",
     )
     try:
         pkg_perception = get_package_share_directory("kart_perception")
@@ -162,7 +163,6 @@ def generate_launch_description():
             condition=IfCondition(LaunchConfiguration("use_yolo")),
         )
     except Exception:
-        # kart_perception not built -- provide a fallback error message
         perception_launch = ExecuteProcess(
             cmd=["echo", "ERROR: kart_perception package not found. Build it first."],
             output="screen",
@@ -180,9 +180,9 @@ def generate_launch_description():
                 "use_sim_time": False,
                 "detections_topic": "/perception/cones_3d",
                 "cmd_vel_topic": "/kart/cmd_vel",
-                "controller_type": LaunchConfiguration("controller"),
-                "weights_json": LaunchConfiguration("weights_json"),
-                "max_speed": 2.0,
+                "controller_type": controller_type,
+                "weights_json": weights_json,
+                "max_speed": 4.5,
                 "min_speed": 0.5,
                 "steering_gain": 1.0,
                 "max_steer": 0.5,
@@ -220,20 +220,50 @@ def generate_launch_description():
         output="screen",
     )
 
+    return [
+        gazebo_headless,
+        gazebo_gui,
+        TimerAction(period=3.0, actions=[bridge]),
+        TimerAction(period=4.0, actions=[camera_info_fix]),
+        TimerAction(period=5.0, actions=[perfect_perception]),
+        TimerAction(period=8.0, actions=[perception_launch]),
+        TimerAction(period=6.0, actions=[cone_follower]),
+        TimerAction(period=5.0, actions=[marker_viz]),
+        TimerAction(period=4.0, actions=[ackermann_to_vel]),
+    ]
+
+
+def generate_launch_description():
     return LaunchDescription(
         [
-            use_yolo_arg,
-            gui_arg,
-            controller_arg,
-            weights_json_arg,
-            gazebo_headless,
-            gazebo_gui,
-            TimerAction(period=3.0, actions=[bridge]),
-            TimerAction(period=4.0, actions=[camera_info_fix]),
-            TimerAction(period=5.0, actions=[perfect_perception]),
-            TimerAction(period=8.0, actions=[perception_launch]),
-            TimerAction(period=6.0, actions=[cone_follower]),
-            TimerAction(period=5.0, actions=[marker_viz]),
-            TimerAction(period=4.0, actions=[ackermann_to_vel]),
+            DeclareLaunchArgument(
+                "track",
+                default_value="oval",
+                description="Track to load: 'oval' or 'hairpin'.",
+            ),
+            DeclareLaunchArgument(
+                "use_yolo",
+                default_value="false",
+                description="Use YOLO perception instead of perfect perception.",
+            ),
+            DeclareLaunchArgument(
+                "gui",
+                default_value="false",
+                description="Launch Gazebo with GUI (for AnyDesk/display).",
+            ),
+            DeclareLaunchArgument(
+                "controller",
+                default_value="neural_v2",
+                description="Controller type: 'geometric', 'neural', or 'neural_v2'.",
+            ),
+            DeclareLaunchArgument(
+                "weights_json",
+                default_value=os.path.join(
+                    get_package_share_directory("kart_sim"),
+                    "config", "neural_v2_weights.json",
+                ),
+                description="Path to neural-net weights JSON (from sim2d GA trainer).",
+            ),
+            OpaqueFunction(function=_launch_setup),
         ]
     )

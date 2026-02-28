@@ -1,0 +1,177 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <world name="hairpin_track">
+
+    <!-- Physics: run at wall-clock speed -->
+    <physics name="sim" type="ode">
+      <max_step_size>0.004</max_step_size>
+      <real_time_update_rate>250</real_time_update_rate>
+      <real_time_factor>1</real_time_factor>
+    </physics>
+
+    <!-- Sensors plugin (renders camera images) -->
+    <plugin
+      filename="ignition-gazebo-sensors-system"
+      name="ignition::gazebo::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+    <!-- Scene broadcaster for topic state -->
+    <plugin
+      filename="ignition-gazebo-scene-broadcaster-system"
+      name="ignition::gazebo::systems::SceneBroadcaster">
+    </plugin>
+
+    <!-- Physics plugin -->
+    <plugin
+      filename="ignition-gazebo-physics-system"
+      name="ignition::gazebo::systems::Physics">
+    </plugin>
+
+    <!-- User commands (e.g. for spawn/delete) -->
+    <plugin
+      filename="ignition-gazebo-user-commands-system"
+      name="ignition::gazebo::systems::UserCommands">
+    </plugin>
+
+    <!-- Sun (no shadows for performance) -->
+    <light name="sun" type="directional">
+      <cast_shadows>false</cast_shadows>
+      <pose>0 0 20 0 0 0</pose>
+      <diffuse>0.9 0.9 0.9 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <direction>-0.3 0.2 -1.0</direction>
+    </light>
+
+    <!-- Ambient light -->
+    <scene>
+      <ambient>0.6 0.6 0.6 1</ambient>
+      <background>0.4 0.6 0.9 1</background>
+    </scene>
+
+    <!-- Ground plane (dark asphalt) -->
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>200 200</size>
+            </plane>
+          </geometry>
+          <surface>
+            <friction>
+              <ode><mu>1.0</mu><mu2>1.0</mu2></ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>200 200</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.3 0.3 0.3 1</ambient>
+            <diffuse>0.3 0.3 0.3 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Kart (start position: right straight, facing +Y) -->
+    <include>
+      <uri>model://kart</uri>
+      <name>kart</name>
+      <pose>16 5 0 0 0 1.5708</pose>
+    </include>
+
+    <!--
+      Hairpin track layout:
+      - Blue cones on the LEFT (inner) boundary
+      - Yellow cones on the RIGHT (outer) boundary
+      - Orange big cones at start/finish
+      - Track width ~3m, two 180-degree hairpin turns (R=8m)
+      - Kart starts at (16, 5) facing +Y, drives counterclockwise
+
+      Small cone mesh half-height: 0.1517m (z-offset to sit on ground)
+      Big cone scaled half-height: 0.252m
+    -->
+
+    <!-- === RIGHT STRAIGHT (x=14.5/17.5, y: 0→10) === -->
+    <!-- Blue cones (left/inner side = x=14.5) -->
+    <include><uri>model://cone_blue</uri><name>blue_rs_0</name><pose>14.5 0 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_rs_1</name><pose>14.5 5 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_rs_2</name><pose>14.5 10 0.1517 0 0 0</pose></include>
+
+    <!-- Yellow cones (right/outer side = x=17.5) -->
+    <include><uri>model://cone_yellow</uri><name>yellow_rs_0</name><pose>17.5 0 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_rs_1</name><pose>17.5 5 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_rs_2</name><pose>17.5 10 0.1517 0 0 0</pose></include>
+
+    <!-- === TOP HAIRPIN (center (8,10), inner R=6.5, outer R=9.5, 0°→180°) === -->
+    <!-- Blue inner curve -->
+    <include><uri>model://cone_blue</uri><name>blue_th_0</name><pose>14.0052 12.4874 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_th_1</name><pose>12.5962 14.5962 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_th_2</name><pose>10.4874 16.0052 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_th_3</name><pose>8.0 16.5 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_th_4</name><pose>5.5126 16.0052 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_th_5</name><pose>3.4038 14.5962 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_th_6</name><pose>1.9948 12.4874 0.1517 0 0 0</pose></include>
+
+    <!-- Yellow outer curve -->
+    <include><uri>model://cone_yellow</uri><name>yellow_th_0</name><pose>16.7769 13.6355 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_th_1</name><pose>14.7175 16.7175 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_th_2</name><pose>11.6355 18.7769 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_th_3</name><pose>8.0 19.5 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_th_4</name><pose>4.3645 18.7769 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_th_5</name><pose>1.2825 16.7175 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_th_6</name><pose>-0.7769 13.6355 0.1517 0 0 0</pose></include>
+
+    <!-- === LEFT STRAIGHT (x=1.5/-1.5, y: 10→0) === -->
+    <!-- Blue cones (left/inner side = x=1.5) -->
+    <include><uri>model://cone_blue</uri><name>blue_ls_0</name><pose>1.5 10 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_ls_1</name><pose>1.5 5 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_ls_2</name><pose>1.5 0 0.1517 0 0 0</pose></include>
+
+    <!-- Yellow cones (right/outer side = x=-1.5) -->
+    <include><uri>model://cone_yellow</uri><name>yellow_ls_0</name><pose>-1.5 10 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_ls_1</name><pose>-1.5 5 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_ls_2</name><pose>-1.5 0 0.1517 0 0 0</pose></include>
+
+    <!-- === BOTTOM HAIRPIN (center (8,0), inner R=6.5, outer R=9.5, 180°→360°) === -->
+    <!-- Blue inner curve -->
+    <include><uri>model://cone_blue</uri><name>blue_bh_0</name><pose>1.9948 -2.4874 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_bh_1</name><pose>3.4038 -4.5962 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_bh_2</name><pose>5.5126 -6.0052 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_bh_3</name><pose>8.0 -6.5 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_bh_4</name><pose>10.4874 -6.0052 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_bh_5</name><pose>12.5962 -4.5962 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_bh_6</name><pose>14.0052 -2.4874 0.1517 0 0 0</pose></include>
+
+    <!-- Yellow outer curve -->
+    <include><uri>model://cone_yellow</uri><name>yellow_bh_0</name><pose>-0.7769 -3.6355 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_bh_1</name><pose>1.2825 -6.7175 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_bh_2</name><pose>4.3645 -8.7769 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_bh_3</name><pose>8.0 -9.5 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_bh_4</name><pose>11.6355 -8.7769 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_bh_5</name><pose>14.7175 -6.7175 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_bh_6</name><pose>16.7769 -3.6355 0.1517 0 0 0</pose></include>
+
+    <!-- === ORANGE BIG CONES at start/finish (right straight, y~5) === -->
+    <include><uri>model://cone_orange_big</uri><name>orange_sf_0</name><pose>15.0 4.5 0.252 0 0 0</pose></include>
+    <include><uri>model://cone_orange_big</uri><name>orange_sf_1</name><pose>15.0 5.5 0.252 0 0 0</pose></include>
+    <include><uri>model://cone_orange_big</uri><name>orange_sf_2</name><pose>17.0 4.5 0.252 0 0 0</pose></include>
+    <include><uri>model://cone_orange_big</uri><name>orange_sf_3</name><pose>17.0 5.5 0.252 0 0 0</pose></include>
+
+    <!-- Default camera: top-down view of the hairpin track -->
+    <gui fullscreen="0">
+      <camera name="user_camera">
+        <pose>8 5 30.0 0 1.5708 0</pose>
+      </camera>
+    </gui>
+
+  </world>
+</sdf>
