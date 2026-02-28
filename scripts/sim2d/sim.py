@@ -12,8 +12,14 @@ MAX_STEPS = 2000
 OFF_TRACK_THRESHOLD = 5.0  # m from centerline
 
 
-def run_episode(controller, max_steps=MAX_STEPS):
+def run_episode(controller, max_steps=MAX_STEPS, fitness_mode="v1"):
     """Run one full episode.
+
+    Parameters
+    ----------
+    fitness_mode : "v1" | "v2"
+        v1: distance + lap bonus - CTE + speed (original)
+        v2: lap-time based — completing laps fast is king
 
     Returns
     -------
@@ -21,6 +27,9 @@ def run_episode(controller, max_steps=MAX_STEPS):
     """
     state = KartState(SPAWN_X, SPAWN_Y, SPAWN_YAW, speed=0.0)
     controller.reset()
+
+    # Check if controller accepts current_speed (v2)
+    wants_speed = hasattr(controller, '_last_speed')
 
     s_prev, _ = project_to_centerline(state.x, state.y)
     total_distance = 0.0
@@ -30,7 +39,13 @@ def run_episode(controller, max_steps=MAX_STEPS):
 
     for _ in range(max_steps):
         visible = perceive(state, BLUE_CONES, YELLOW_CONES, ORANGE_CONES)
-        steer, speed_cmd = controller.control(visible)
+
+        if wants_speed:
+            steer, speed_cmd = controller.control(visible,
+                                                  current_speed=state.speed)
+        else:
+            steer, speed_cmd = controller.control(visible)
+
         state = kart_step(state, steer, speed_cmd)
         steps += 1
 
@@ -54,11 +69,20 @@ def run_episode(controller, max_steps=MAX_STEPS):
     avg_cte = total_cte / steps if steps else 0.0
     avg_speed = total_speed / steps if steps else 0.0
     laps = int(total_distance / TRACK_LENGTH) if total_distance > 0 else 0
+    time = steps * DT
 
-    fitness = (total_distance
-               + 100.0 * laps
-               - 2.0 * avg_cte
-               + 0.5 * avg_speed)
+    if fitness_mode == "v2":
+        if laps >= 1:
+            # Completing laps fast: big lap bonus, penalise time and weaving
+            fitness = 500.0 * laps - time - 5.0 * avg_cte
+        else:
+            # Haven't completed a lap yet: reward progress, penalise weaving
+            fitness = total_distance - 2.0 * avg_cte
+    else:
+        fitness = (total_distance
+                   + 100.0 * laps
+                   - 2.0 * avg_cte
+                   + 0.5 * avg_speed)
 
     return {
         "fitness": fitness,
@@ -67,5 +91,5 @@ def run_episode(controller, max_steps=MAX_STEPS):
         "avg_cte": avg_cte,
         "avg_speed": avg_speed,
         "steps": steps,
-        "time": steps * DT,
+        "time": time,
     }

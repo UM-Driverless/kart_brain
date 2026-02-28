@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """Cone-following controller for the kart.
 
-Supports two controller types (selected via the ``controller_type`` param):
+Supports three controller types (selected via the ``controller_type`` param):
 
-**geometric** (default)
+**geometric**
     Nearest blue/yellow midpoint → atan2 → steer.  Six tunable params.
 
 **neural**
-    Small feed-forward net (8→8→2) whose weights are loaded from a JSON
-    file produced by the 2D-sim GA trainer (``scripts/sim2d/train.py``).
+    Small feed-forward net (8→8→2), 90 weights.
 
-Both controllers receive Detection3DArray in the camera *optical* frame
+**neural_v2**
+    Larger net (17→16→2) with 4 cones per side + speed feedback, 322 weights.
+    Trained with lap-time fitness for faster driving.
+
+All controllers receive Detection3DArray in the camera *optical* frame
 (Z=forward, X=right, Y=down) and publish Twist on ``/kart/cmd_vel``.
 """
 
@@ -32,7 +35,7 @@ class ConeFollowerNode(Node):
         self.declare_parameter("detections_topic", "/perception/cones_3d")
         self.declare_parameter("cmd_vel_topic", "/kart/cmd_vel")
         self.declare_parameter("no_cone_timeout", 1.0)
-        self.declare_parameter("controller_type", "geometric")  # "geometric" | "neural"
+        self.declare_parameter("controller_type", "geometric")  # geometric|neural|neural_v2
         self.declare_parameter("weights_json", "")               # path for neural
 
         # --- geometric params ---
@@ -58,12 +61,17 @@ class ConeFollowerNode(Node):
         self.half_track_width = float(self.get_parameter("half_track_width").value)
         self.speed_curve_factor = float(self.get_parameter("speed_curve_factor").value)
 
-        # neural net weights (loaded if controller_type == "neural")
+        # neural net weights (loaded for neural or neural_v2)
         self._nn_W1 = self._nn_b1 = self._nn_W2 = self._nn_b2 = None
         self._nn_max_steer = 0.5
         self._nn_max_speed = 5.0
+        self._nn_input_size = 8    # v1 default
+        self._nn_n_blue = 2        # cones per side for v1
+        self._nn_n_yellow = 2
+        self._nn_uses_speed = False
+        self._current_speed = 0.0
 
-        if self.controller_type == "neural":
+        if self.controller_type in ("neural", "neural_v2"):
             self._load_neural_weights()
 
         # ROS plumbing
@@ -82,7 +90,8 @@ class ConeFollowerNode(Node):
     def _load_neural_weights(self):
         path = str(self.get_parameter("weights_json").value)
         if not path:
-            self.get_logger().error("controller_type=neural but weights_json not set")
+            self.get_logger().error(
+                f"controller_type={self.controller_type} but weights_json not set")
             raise SystemExit(1)
 
         with open(path) as f:
@@ -90,16 +99,30 @@ class ConeFollowerNode(Node):
 
         genes = np.array(data["genes"], dtype=np.float64)
         self.get_logger().info(
-            f"Loaded neural weights from {path} "
+            f"Loaded {self.controller_type} weights from {path} "
             f"(fitness={data.get('fitness', '?')})"
         )
 
-        # Parse: W1 (8×8), b1 (8), W2 (8×2), b2 (2) — 90 genes total
-        i = 0
-        self._nn_W1 = genes[i:i + 64].reshape(8, 8);   i += 64
-        self._nn_b1 = genes[i:i + 8];                   i += 8
-        self._nn_W2 = genes[i:i + 16].reshape(8, 2);    i += 16
-        self._nn_b2 = genes[i:i + 2]
+        if self.controller_type == "neural_v2":
+            # 17→16→2: W1 (17×16), b1 (16), W2 (16×2), b2 (2) — 322 genes
+            self._nn_input_size = 17
+            self._nn_n_blue = 4
+            self._nn_n_yellow = 4
+            self._nn_uses_speed = True
+            hs = 16
+            i = 0
+            self._nn_W1 = genes[i:i + 17 * hs].reshape(17, hs);  i += 17 * hs
+            self._nn_b1 = genes[i:i + hs];                        i += hs
+            self._nn_W2 = genes[i:i + hs * 2].reshape(hs, 2);    i += hs * 2
+            self._nn_b2 = genes[i:i + 2]
+        else:
+            # 8→8→2: W1 (8×8), b1 (8), W2 (8×2), b2 (2) — 90 genes
+            hs = 8
+            i = 0
+            self._nn_W1 = genes[i:i + 8 * hs].reshape(8, hs);  i += 8 * hs
+            self._nn_b1 = genes[i:i + hs];                      i += hs
+            self._nn_W2 = genes[i:i + hs * 2].reshape(hs, 2);   i += hs * 2
+            self._nn_b2 = genes[i:i + 2]
 
     # ── detection callback ────────────────────────────────────────────
 
@@ -119,7 +142,7 @@ class ConeFollowerNode(Node):
                 continue
             cones.append((class_id, fwd, left))
 
-        if self.controller_type == "neural":
+        if self.controller_type in ("neural", "neural_v2"):
             steer, speed = self._control_neural(cones)
         else:
             steer, speed = self._control_geometric(cones)
@@ -189,23 +212,28 @@ class ConeFollowerNode(Node):
         blues.sort()
         yellows.sort()
 
-        inp = np.zeros(8)
-        for j, (d, a) in enumerate(blues[:2]):
+        nb = self._nn_n_blue
+        ny = self._nn_n_yellow
+        inp = np.zeros(self._nn_input_size)
+        for j, (d, a) in enumerate(blues[:nb]):
             inp[j * 2] = d / 15.0
             inp[j * 2 + 1] = a / np.pi
-        for j, (d, a) in enumerate(yellows[:2]):
-            inp[4 + j * 2] = d / 15.0
-            inp[4 + j * 2 + 1] = a / np.pi
+        for j, (d, a) in enumerate(yellows[:ny]):
+            inp[nb * 2 + j * 2] = d / 15.0
+            inp[nb * 2 + j * 2 + 1] = a / np.pi
+        if self._nn_uses_speed:
+            inp[-1] = self._current_speed / self._nn_max_speed
 
         hidden = np.tanh(inp @ self._nn_W1 + self._nn_b1)
         out = hidden @ self._nn_W2 + self._nn_b2
 
         steer = float(np.tanh(out[0])) * self._nn_max_steer
         speed = float(1.0 / (1.0 + np.exp(-out[1]))) * self._nn_max_speed
+        self._current_speed = speed  # track for next iteration
 
         self._last_steer = steer
         self.get_logger().info(
-            f"[nn] steer={steer:.3f} speed={speed:.1f} "
+            f"[{self.controller_type}] steer={steer:.3f} speed={speed:.1f} "
             f"blues={len(blues)} yellows={len(yellows)}"
         )
         return steer, speed

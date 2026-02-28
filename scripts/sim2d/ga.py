@@ -5,19 +5,23 @@ from multiprocessing import Pool
 
 from sim import run_episode
 
+# Module-level fitness_mode so worker processes can see it (set by GA)
+_fitness_mode = "v1"
+
 
 def _evaluate_one(args):
     """Top-level worker function (must be picklable for multiprocessing)."""
     controller_class, genes = args
     ctrl = controller_class(genes)
-    return run_episode(ctrl)["fitness"]
+    return run_episode(ctrl, fitness_mode=_fitness_mode)["fitness"]
 
 
 class GeneticAlgorithm:
     """Standard GA with tournament selection, uniform crossover, Gaussian mutation."""
 
     def __init__(self, controller_class, pop_size=100, elite_size=5,
-                 tournament_k=5, mutation_sigma=0.1, mutation_decay=0.995):
+                 tournament_k=5, mutation_sigma=0.1, mutation_decay=0.995,
+                 fitness_mode="v1"):
         self.controller_class = controller_class
         self.pop_size = pop_size
         self.elite_size = elite_size
@@ -25,6 +29,7 @@ class GeneticAlgorithm:
         self.mutation_sigma = mutation_sigma
         self.mutation_decay = mutation_decay
         self.num_genes = controller_class.NUM_GENES
+        self.fitness_mode = fitness_mode
 
         self.population = self._init_population()
         self.fitnesses = np.zeros(pop_size)
@@ -51,6 +56,9 @@ class GeneticAlgorithm:
     # ── evaluation ────────────────────────────────────────────────────
 
     def evaluate(self, workers=1):
+        global _fitness_mode
+        _fitness_mode = self.fitness_mode
+
         args = [(self.controller_class, self.population[i])
                 for i in range(self.pop_size)]
 

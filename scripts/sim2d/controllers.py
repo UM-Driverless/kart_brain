@@ -1,4 +1,4 @@
-"""Controllers: geometric (mirrors cone_follower_node.py) and neural net."""
+"""Controllers: geometric, neural net v1, and neural net v2."""
 
 import math
 import numpy as np
@@ -159,6 +159,90 @@ class NeuralNetController:
         for j, (d, a) in enumerate(yellows[:2]):
             inp[4 + j * 2] = d / 15.0
             inp[4 + j * 2 + 1] = a / np.pi
+
+        hidden = np.tanh(inp @ self.W1 + self.b1)
+        out = hidden @ self.W2 + self.b2
+
+        steer = float(np.tanh(out[0])) * self.MAX_STEER
+        speed = float(1.0 / (1.0 + np.exp(-out[1]))) * self.MAX_SPEED
+        return steer, speed
+
+
+# ── Neural-net v2 controller ──────────────────────────────────────────────
+
+class NeuralNetV2Controller:
+    """Larger net with more cone context and speed feedback.
+
+    Architecture
+    ------------
+    Input  (17): 4 nearest blue × (dist, angle)
+               + 4 nearest yellow × (dist, angle)
+               + current speed (normalized)
+    Hidden (16): tanh activation
+    Output  (2): tanh → steer,  sigmoid → speed
+
+    Total genes = 17×16 + 16 + 16×2 + 2 = 322
+    """
+
+    INPUT_SIZE = 17
+    HIDDEN_SIZE = 16
+    OUTPUT_SIZE = 2
+    NUM_GENES = (INPUT_SIZE * HIDDEN_SIZE + HIDDEN_SIZE
+                 + HIDDEN_SIZE * OUTPUT_SIZE + OUTPUT_SIZE)  # 322
+
+    MAX_STEER = 0.5
+    MAX_SPEED = 5.0
+
+    def __init__(self, genes):
+        g = np.asarray(genes, dtype=np.float64)
+        self.genes = g
+        i = 0
+        n = self.INPUT_SIZE * self.HIDDEN_SIZE
+        self.W1 = g[i:i + n].reshape(self.INPUT_SIZE, self.HIDDEN_SIZE)
+        i += n
+        self.b1 = g[i:i + self.HIDDEN_SIZE]
+        i += self.HIDDEN_SIZE
+        n = self.HIDDEN_SIZE * self.OUTPUT_SIZE
+        self.W2 = g[i:i + n].reshape(self.HIDDEN_SIZE, self.OUTPUT_SIZE)
+        i += n
+        self.b2 = g[i:i + self.OUTPUT_SIZE]
+        self._last_speed = 0.0
+
+    def reset(self):
+        self._last_speed = 0.0
+
+    def control(self, visible_cones, current_speed=None):
+        """Return ``(steer, speed)`` given cones in the optical frame."""
+        if current_speed is not None:
+            self._last_speed = current_speed
+
+        blues = []
+        yellows = []
+
+        for cls, opt_x, _opt_y, opt_z in visible_cones:
+            fwd = opt_z
+            left = -opt_x
+            dist = math.hypot(fwd, left)
+            angle = math.atan2(left, fwd)
+            if cls == "blue_cone":
+                blues.append((dist, angle))
+            elif cls == "yellow_cone":
+                yellows.append((dist, angle))
+
+        blues.sort()
+        yellows.sort()
+
+        inp = np.zeros(self.INPUT_SIZE)
+        # 4 nearest blue
+        for j, (d, a) in enumerate(blues[:4]):
+            inp[j * 2] = d / 15.0
+            inp[j * 2 + 1] = a / np.pi
+        # 4 nearest yellow
+        for j, (d, a) in enumerate(yellows[:4]):
+            inp[8 + j * 2] = d / 15.0
+            inp[8 + j * 2 + 1] = a / np.pi
+        # current speed
+        inp[16] = self._last_speed / self.MAX_SPEED
 
         hidden = np.tanh(inp @ self.W1 + self.b1)
         out = hidden @ self.W2 + self.b2

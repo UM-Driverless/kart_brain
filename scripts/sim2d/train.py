@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Main entry point — runs GA training for geometric and neural-net controllers."""
+"""Main entry point — runs GA training for kart controllers."""
 
 import argparse
 import json
@@ -7,9 +7,15 @@ import multiprocessing
 import os
 import time
 
-from controllers import GeometricController, NeuralNetController
+from controllers import GeometricController, NeuralNetController, NeuralNetV2Controller
 from ga import GeneticAlgorithm
 from sim import run_episode
+
+CONTROLLER_MAP = {
+    "geometric": GeometricController,
+    "neural": NeuralNetController,
+    "neural_v2": NeuralNetV2Controller,
+}
 
 
 def main():
@@ -18,23 +24,26 @@ def main():
     parser.add_argument("--pop-size", type=int, default=100)
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--output-dir", type=str, default="results")
-    parser.add_argument("--geometric-only", action="store_true")
-    parser.add_argument("--neural-only", action="store_true")
+    parser.add_argument("--controllers", type=str, default="geometric,neural",
+                        help="Comma-separated controller types: "
+                             "geometric, neural, neural_v2")
+    parser.add_argument("--fitness", type=str, default="v1",
+                        choices=["v1", "v2"],
+                        help="v1: distance+laps, v2: lap-time based")
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
 
+    names = [n.strip() for n in args.controllers.split(",")]
     gas = {}
-    if not args.neural_only:
-        gas["geometric"] = GeneticAlgorithm(GeometricController,
-                                            pop_size=args.pop_size)
-    if not args.geometric_only:
-        gas["neural"] = GeneticAlgorithm(NeuralNetController,
-                                         pop_size=args.pop_size)
+    for name in names:
+        cls = CONTROLLER_MAP[name]
+        gas[name] = GeneticAlgorithm(cls, pop_size=args.pop_size,
+                                     fitness_mode=args.fitness)
 
     print(f"Training {list(gas.keys())} | "
           f"generations={args.generations}  pop={args.pop_size}  "
-          f"workers={args.workers}\n")
+          f"workers={args.workers}  fitness={args.fitness}\n")
 
     for gen in range(args.generations):
         t0 = time.time()
@@ -52,12 +61,13 @@ def main():
     # Save best controllers
     for name, ga in gas.items():
         ctrl = ga.controller_class(ga.best_genes)
-        result = run_episode(ctrl)
+        result = run_episode(ctrl, fitness_mode=args.fitness)
 
         payload = {
             "controller_type": name,
             "genes": ga.best_genes.tolist(),
             "fitness": ga.best_fitness,
+            "fitness_mode": args.fitness,
             "result": result,
             "generations": args.generations,
             "pop_size": args.pop_size,
@@ -70,7 +80,8 @@ def main():
         print(f"Saved {name} → {path}")
         print(f"  fitness={ga.best_fitness:.1f}  "
               f"dist={result['distance']:.1f}m  laps={result['laps']}  "
-              f"avg_cte={result['avg_cte']:.2f}m  avg_speed={result['avg_speed']:.1f}m/s")
+              f"avg_cte={result['avg_cte']:.2f}m  avg_speed={result['avg_speed']:.1f}m/s  "
+              f"time={result['time']:.1f}s")
         if name == "geometric":
             g = ga.best_genes
             print(f"  genes: gain={g[0]:.3f} max_steer={g[1]:.3f} "

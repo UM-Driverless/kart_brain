@@ -12,11 +12,12 @@ from track import (BLUE_CONES, YELLOW_CONES, ORANGE_CONES, CENTERLINE_XY,
                    SPAWN_X, SPAWN_Y, SPAWN_YAW, project_to_centerline)
 from kart_model import KartState, step as kart_step
 from perception import perceive
-from controllers import GeometricController, NeuralNetController
+from controllers import GeometricController, NeuralNetController, NeuralNetV2Controller
 
 CONTROLLER_CLASSES = {
     "geometric": GeometricController,
     "neural": NeuralNetController,
+    "neural_v2": NeuralNetV2Controller,
 }
 
 

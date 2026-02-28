@@ -38,12 +38,12 @@ ros2 run kart_perception cone_depth_localizer --ros-args \
   -p camera_info_topic:=/zed/zed_node/rgb/camera_info \
   -p output_topic:=/perception/cones_3d &
 
-# Cone follower (3D cones → steering) — neural net controller
-WEIGHTS_JSON=$(ros2 pkg prefix kart_sim)/share/kart_sim/config/neural_weights.json
+# Cone follower (3D cones → steering) — neural net v2 controller
+WEIGHTS_JSON=$(ros2 pkg prefix kart_sim)/share/kart_sim/config/neural_v2_weights.json
 ros2 run kart_sim cone_follower_node.py --ros-args \
   -p detections_topic:=/perception/cones_3d \
   -p cmd_vel_topic:=/kart/cmd_vel \
-  -p controller_type:=neural \
+  -p controller_type:=neural_v2 \
   -p weights_json:="$WEIGHTS_JSON" &
 
 # Steering HUD overlay

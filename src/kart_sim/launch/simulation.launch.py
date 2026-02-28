@@ -43,11 +43,11 @@ def generate_launch_description():
         default_value="false",
         description="Launch Gazebo with GUI (for AnyDesk/display).",
     )
-    default_weights = os.path.join(pkg_kart_sim, "config", "neural_weights.json")
+    default_weights = os.path.join(pkg_kart_sim, "config", "neural_v2_weights.json")
     controller_arg = DeclareLaunchArgument(
         "controller",
-        default_value="neural",
-        description="Controller type: 'geometric' or 'neural'.",
+        default_value="neural_v2",
+        description="Controller type: 'geometric', 'neural', or 'neural_v2'.",
     )
     weights_json_arg = DeclareLaunchArgument(
         "weights_json",
