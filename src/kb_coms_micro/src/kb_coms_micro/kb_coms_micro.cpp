@@ -16,7 +16,7 @@ KB_coms_micro::KB_coms_micro() : Node("kb_coms_micro_node") {
     esp_heart_pub_ = create_publisher<kb_interfaces::msg::Frame>("/esp32/heartbeat", 10);
 
     tx_sub_ = create_subscription<kb_interfaces::msg::Frame>(
-        "/ejemplo_sub", 10, std::bind(&KB_coms_micro::tx_callback, this, std::placeholders::_1));
+        "/esp32/tx", 10, std::bind(&KB_coms_micro::tx_callback, this, std::placeholders::_1));
 
     // Inicializa la librería serial
     serial_ = std::make_unique<SerialDriver>(

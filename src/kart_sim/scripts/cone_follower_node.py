@@ -25,17 +25,19 @@ class ConeFollowerNode(Node):
 
         self.declare_parameter("detections_topic", "/perception/cones_3d")
         self.declare_parameter("cmd_vel_topic", "/kart/cmd_vel")
-        self.declare_parameter("steering_gain", 2.0)
+        self.declare_parameter("steering_gain", 1.0)
+        self.declare_parameter("max_steer", 0.5)
         self.declare_parameter("max_speed", 2.0)
         self.declare_parameter("min_speed", 0.5)
         self.declare_parameter("lookahead_max", 15.0)
         self.declare_parameter("half_track_width", 1.5)
-        self.declare_parameter("speed_curve_factor", 1.5)
+        self.declare_parameter("speed_curve_factor", 1.0)
         self.declare_parameter("no_cone_timeout", 1.0)
 
         det_topic = str(self.get_parameter("detections_topic").value)
         cmd_topic = str(self.get_parameter("cmd_vel_topic").value)
         self.steering_gain = float(self.get_parameter("steering_gain").value)
+        self.max_steer = float(self.get_parameter("max_steer").value)
         self.max_speed = float(self.get_parameter("max_speed").value)
         self.min_speed = float(self.get_parameter("min_speed").value)
         self.lookahead_max = float(self.get_parameter("lookahead_max").value)
@@ -109,8 +111,7 @@ class ConeFollowerNode(Node):
             angle = math.atan2(mid_left, mid_fwd)
 
             steer = self.steering_gain * angle
-            # Clamp to max steering (0.5 rad ~ 29 deg)
-            steer = max(-0.5, min(0.5, steer))
+            steer = max(-self.max_steer, min(self.max_steer, steer))
             cmd.angular.z = steer
             self._last_steer = steer
 
