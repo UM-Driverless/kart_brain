@@ -129,7 +129,9 @@ class ConeFollowerNode(Node):
     def _on_detections(self, msg: Detection3DArray):
         self.last_detection_time = self.get_clock().now()
 
-        # Parse detections into (class_id, fwd, left) in camera_link frame
+        # Parse detections into (class_id, fwd, left) in camera_link frame.
+        # Filter to match 2D-sim training perception (FOV ±40°, range 15 m)
+        # so the neural nets receive in-distribution inputs.
         cones = []
         for det in msg.detections:
             if not det.results:
@@ -139,6 +141,12 @@ class ConeFollowerNode(Node):
             fwd = pos.z
             left = -pos.x
             if fwd < 0.5:
+                continue
+            dist = math.hypot(fwd, left)
+            if dist > 15.0:
+                continue
+            angle = abs(math.atan2(left, fwd))
+            if angle > 0.6981:  # ±40° in radians
                 continue
             cones.append((class_id, fwd, left))
 
