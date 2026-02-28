@@ -382,6 +382,7 @@ int SerialDriver::process_byte(uint8_t byte)
         case State::TYPE:
             type_ = byte;
             index_ = 0;
+            payload_.clear();
             state_ = (len_ == 0) ? State::CRC : State::PAYLOAD;
             break;
 
@@ -401,9 +402,8 @@ int SerialDriver::process_byte(uint8_t byte)
                      payload_.begin() + len_);
                 rx_ok_++;
                 std::cout << "Mensaje recibido correctamente, llamando a callback de nodo ros" << std::endl;
+                state_ = State::WAIT_SOF;
                 callback_(frame);
-
-                // End of msg
                 return 1;
 
             } else {
