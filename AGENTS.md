@@ -19,17 +19,23 @@ Before making any changes to the kart_brain workspace, consult:
 
 ### UTM VM (Simulation)
 - **Connection:** `ssh utm` (192.168.65.2)
-- **Workspace:** `~/kart_sw/`
+- **Workspace:** `~/kart_brain/`
 - **Simulator:** Gazebo Fortress (headless, CPU rendering)
 - **sudo password:** `0`
 - **Full details:** `.agents/vm_environment.md`
 
+## Critical Rules
+- **Environment is in `.bashrc`** — ROS, workspace, and `IGN_GAZEBO_RESOURCE_PATH` are all sourced in `.bashrc` on every machine. **Never tell the user to source or export these manually.**
+- **Gazebo Fortress uses `ign` CLI**, not `gz`. Message types are `ignition.msgs.*`, not `gz.msgs.*`.
+- **No `<cone>` geometry** in SDF — use `<cylinder>` instead (Fortress limitation).
+- **Odom is relative to spawn** — always account for the kart's initial world position.
+- **No GPU on the VM** — keep camera resolution at 640x360, disable shadows, use headless rendering.
+- When something goes wrong, document it in `.agents/error_log.md`.
+
 ## Build & Run
 ```bash
 # Build everything
-source /opt/ros/humble/setup.bash
 cd ~/kart_brain && colcon build
-source install/setup.bash
 
 # Build single package
 colcon build --packages-select kart_perception

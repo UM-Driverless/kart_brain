@@ -3,7 +3,7 @@
 ## Workspace Structure
 
 ```
-~/kart_sw/                          (colcon ROS 2 workspace)
+~/kart_brain/                          (colcon ROS 2 workspace)
 ├── AGENTS.md                       ← Agent entry point
 ├── .agents/                        ← This directory
 ├── src/

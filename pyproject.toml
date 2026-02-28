@@ -1,7 +1,7 @@
 [project]
-name = "kart_sw"
+name = "kart_brain"
 version = "0.0.0"
-description = "Workspace dependencies for kart_sw Python tools."
+description = "Workspace dependencies for kart_brain Python tools."
 dependencies = [
   "gitpython>=3.1.30",
   "matplotlib>=3.3",

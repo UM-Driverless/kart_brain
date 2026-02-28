@@ -62,7 +62,7 @@ export LD_LIBRARY_PATH=/usr/local/cuda-12.6/targets/aarch64-linux/lib:$(find ~/.
 | Path | Description |
 |---|---|
 | `/home/orin/kart_brain` | Main ROS2 workspace (this repo) |
-| `~/Desktop/KART_SW` | Old copy of kart_sw |
+| `~/Desktop/KART_SW` | Old copy of kart_sw (can be deleted) |
 | `~/Desktop/kart_medulla` | ESP32 firmware (PlatformIO) — **not present**, needs cloning from https://github.com/UM-Driverless/kart_medulla |
 
 ## ZED Camera

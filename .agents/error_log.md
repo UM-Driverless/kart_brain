@@ -115,6 +115,22 @@ Tracks mistakes made during development and the prevention mechanisms added. Eve
 - Rule: **Pin `numpy<2`** after any torch install (pyzed and cv2 need numpy 1.x)
 - Rule: **Never install torchvision from PyPI on Jetson** — it pulls CPU-only torch as a dependency. Always install from the same Jetson index.
 
+## 2026-02-28 - Failed to visually validate trajectory — kart exited track undetected
+**What happened:** After training a neural_v2 controller with cone-proximity penalty, I generated a trajectory plot and claimed "0 boundary violations" and "trajectory stays between cones." The user immediately spotted that the trajectory went far outside the cone boundaries — reaching y=30 while cones only go to y=23. The root cause was twofold: (1) the centerline in `track.py` was a hardcoded R=20 oval that didn't match actual cone positions (7–8.5m beyond outermost cones at curves), and (2) the "validation" only checked distance to individual cone *points*, not to the boundary *line segments* between cones. The kart exited the track in the gaps between cones without approaching any single cone. Actual analysis showed 1324/2001 steps were outside the track polygon.
+**Prevention added:**
+- Rule: **Always visually inspect generated plots with critical eyes.** Don't just describe what you expect to see — look for actual discrepancies between the trajectory and landmarks (cones, boundaries).
+- Rule: **Track boundaries are line segments between consecutive cones, not just the cone points.** Distance to individual cones is not sufficient — use polygon-based boundary checking (point-in-polygon + segment distance).
+- Rewrote `track.py` centerline to derive from actual cone midpoints `(BLUE_CONES + YELLOW_CONES) / 2.0` instead of hardcoded oval geometry.
+- Added `is_inside_track()` (ray-casting point-in-polygon) and `dist_to_boundary()` (vectorized segment distance) to `track.py`.
+- v4 fitness now terminates immediately if the kart leaves the track polygon.
+
+## 2026-02-28 - Repeatedly gave unnecessary source/export commands (already in .bashrc)
+**What happened:** When giving instructions to launch the Gazebo simulation, I kept including `source /opt/ros/humble/setup.bash`, `source install/setup.bash`, and `export IGN_GAZEBO_RESOURCE_PATH=...` as manual steps. The user pointed out that all of these are already in `.bashrc`. I documented this error, then immediately repeated it in the very next set of instructions I gave. Root cause: CLAUDE.md and `.agents/simulation.md` contained these source/export lines in their code blocks, and I was copying from them mechanically.
+**Prevention added:**
+- Removed all `source` and `export` lines from the Quick Start code blocks in `CLAUDE.md` and `.agents/simulation.md`
+- Added explicit note in `CLAUDE.md`: "**Never tell the user to source or export these manually**"
+- Rule: **All environment setup (ROS, workspace, Gazebo resource path) is in `.bashrc` on every machine.** Just run commands directly — never prepend source/export boilerplate.
+
 ## 2026-02-22 - AnyDesk black screen without ConnectedMonitor Xorg option
 **What happened:** AnyDesk showed a black framebuffer. The NVIDIA driver saw DFP-0 and DFP-1 as "disconnected" because the dummy HDMI plug (via DP-to-HDMI adapter) didn't provide proper EDID. Without a connected monitor, Xorg had no screen.
 **Prevention added:**

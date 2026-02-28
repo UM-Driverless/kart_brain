@@ -1,4 +1,4 @@
-# kart_sw
+# kart_brain
 
 ROS workspace for the UM-Driverless kart software stack.
 
