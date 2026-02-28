@@ -204,25 +204,25 @@ class PerfectPerceptionNode(Node):
             if abs(angle) > half_fov:
                 continue
 
-            # In camera optical frame: Z=forward, X=right, Y=down
-            # But perception nodes expect camera_link frame where X=forward
-            # So publish in camera_link frame directly
+            # Publish in camera optical frame (Z=forward, X=right, Y=down)
+            # to match what cone_depth_localizer outputs.
+            # cone_follower expects this convention and converts internally.
             det = Detection3D()
             det.header = out.header
 
             hyp = ObjectHypothesisWithPose()
             hyp.hypothesis.class_id = cone["class_id"]
             hyp.hypothesis.score = 1.0
-            hyp.pose.pose.position.x = cx
-            hyp.pose.pose.position.y = cy
-            hyp.pose.pose.position.z = cone["z"]
+            hyp.pose.pose.position.x = -cy   # optical X = right = -left
+            hyp.pose.pose.position.y = -(cone["z"] - self.cam_z)  # optical Y = down
+            hyp.pose.pose.position.z = cx     # optical Z = forward
             hyp.pose.pose.orientation.w = 1.0
             det.results.append(hyp)
 
             bbox = BoundingBox3D()
-            bbox.center.position.x = cx
-            bbox.center.position.y = cy
-            bbox.center.position.z = cone["z"]
+            bbox.center.position.x = -cy
+            bbox.center.position.y = -(cone["z"] - self.cam_z)
+            bbox.center.position.z = cx
             bbox.center.orientation.w = 1.0
             bbox.size.x = 0.25
             bbox.size.y = 0.25
