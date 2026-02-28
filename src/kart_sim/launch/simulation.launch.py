@@ -38,9 +38,14 @@ def generate_launch_description():
         default_value="false",
         description="Use YOLO perception instead of perfect perception.",
     )
+    gui_arg = DeclareLaunchArgument(
+        "gui",
+        default_value="false",
+        description="Launch Gazebo with GUI (for AnyDesk/display).",
+    )
 
-    # --- 1. Gazebo Server (headless) ---
-    gazebo_server = ExecuteProcess(
+    # --- 1. Gazebo (headless by default, GUI with gui:=true) ---
+    gazebo_headless = ExecuteProcess(
         cmd=[
             "ign", "gazebo", "-s", "-r", "--headless-rendering",
             world_file,
@@ -49,6 +54,18 @@ def generate_launch_description():
         additional_env={
             "IGN_GAZEBO_RESOURCE_PATH": model_path,
         },
+        condition=UnlessCondition(LaunchConfiguration("gui")),
+    )
+    gazebo_gui = ExecuteProcess(
+        cmd=[
+            "ign", "gazebo", "-r",
+            world_file,
+        ],
+        output="screen",
+        additional_env={
+            "IGN_GAZEBO_RESOURCE_PATH": model_path,
+        },
+        condition=IfCondition(LaunchConfiguration("gui")),
     )
 
     # --- 2. ros_gz_bridge ---
@@ -153,10 +170,11 @@ def generate_launch_description():
                 "cmd_vel_topic": "/kart/cmd_vel",
                 "max_speed": 2.0,
                 "min_speed": 0.5,
-                "steering_gain": 2.0,
+                "steering_gain": 1.0,
+                "max_steer": 0.5,
                 "lookahead_max": 15.0,
                 "half_track_width": 1.5,
-                "speed_curve_factor": 1.5,
+                "speed_curve_factor": 1.0,
             }
         ],
     )
@@ -183,7 +201,9 @@ def generate_launch_description():
     return LaunchDescription(
         [
             use_yolo_arg,
-            gazebo_server,
+            gui_arg,
+            gazebo_headless,
+            gazebo_gui,
             TimerAction(period=3.0, actions=[bridge]),
             TimerAction(period=4.0, actions=[camera_info_fix]),
             TimerAction(period=5.0, actions=[perfect_perception]),
