@@ -34,63 +34,57 @@ ORANGE_CONES = np.array([
 ])
 
 # ---------------------------------------------------------------------------
-# Track geometry
+# Track geometry — derived from actual cone positions
 # ---------------------------------------------------------------------------
-# Oval: two 20m straights + two semicircles of radius 20m (centerline)
-# Direction: counterclockwise.  Start/finish at (20, 0) facing +Y.
-#
-# Parameterization (s = distance along centerline from start):
-#   s ∈ [0,  10)          right straight  (20, 0)→(20, 10)
-#   s ∈ [10, 10+πR)       top semicircle  center (0,10), θ 0→π
-#   s ∈ [10+πR, 30+πR)    left straight   (-20,10)→(-20,-10)
-#   s ∈ [30+πR, 30+2πR)   bottom semicircle center (0,-10), θ π→2π
-#   s ∈ [30+2πR, 40+2πR)  right straight  (20,-10)→(20, 0)
-
-CURVE_RADIUS = 20.0
-STRAIGHT_LEN = 20.0
-CURVE_LEN = np.pi * CURVE_RADIUS            # ≈62.83 m
-TRACK_LENGTH = 2 * STRAIGHT_LEN + 2 * CURVE_LEN  # ≈165.66 m
-
-# Segment boundaries
-_S1 = 10.0                   # end of first half-straight
-_S2 = _S1 + CURVE_LEN        # end of top semicircle
-_S3 = _S2 + STRAIGHT_LEN     # end of left straight
-_S4 = _S3 + CURVE_LEN        # end of bottom semicircle
-# _S5 = _S4 + 10.0 == TRACK_LENGTH
+# The centerline is the midpoint between corresponding blue/yellow cones,
+# densified by linear interpolation.  Direction: counterclockwise.
+# Start/finish at (20, 0) facing +Y.
 
 # Spawn pose
 SPAWN_X, SPAWN_Y, SPAWN_YAW = 20.0, 0.0, np.pi / 2
 
 # ---------------------------------------------------------------------------
-# Dense centerline for projection
+# Centerline from cone midpoints
 # ---------------------------------------------------------------------------
-NUM_CENTERLINE_POINTS = 2000
+# Midpoint vertices (20 points forming a closed polygon)
+_MIDPOINTS = (BLUE_CONES + YELLOW_CONES) / 2.0
+
+# Find the index of the midpoint closest to spawn (20, 0)
+_spawn_dists = np.hypot(_MIDPOINTS[:, 0] - SPAWN_X, _MIDPOINTS[:, 1] - SPAWN_Y)
+_spawn_idx = int(np.argmin(_spawn_dists))
+
+# Reorder midpoints so index 0 is the one nearest the spawn
+_MIDPOINTS_ORDERED = np.roll(_MIDPOINTS, -_spawn_idx, axis=0)
+
+NUM_INTERP_PER_SEGMENT = 100  # interpolation points between each pair of vertices
 
 
-def _centerline_point(s):
-    """Return (x, y) for a given distance-along-track parameter."""
-    s = s % TRACK_LENGTH
-    if s < _S1:
-        return 20.0, s
-    elif s < _S2:
-        theta = (s - _S1) / CURVE_RADIUS
-        return CURVE_RADIUS * np.cos(theta), 10.0 + CURVE_RADIUS * np.sin(theta)
-    elif s < _S3:
-        return -20.0, 10.0 - (s - _S2)
-    elif s < _S4:
-        theta = np.pi + (s - _S3) / CURVE_RADIUS
-        return CURVE_RADIUS * np.cos(theta), -10.0 + CURVE_RADIUS * np.sin(theta)
-    else:
-        return 20.0, -10.0 + (s - _S4)
+def _densify_midpoints():
+    """Densify the midpoint polygon into a smooth centerline."""
+    n = len(_MIDPOINTS_ORDERED)
+    points = []
+    cum_s = [0.0]
+    for i in range(n):
+        p0 = _MIDPOINTS_ORDERED[i]
+        p1 = _MIDPOINTS_ORDERED[(i + 1) % n]
+        seg_len = np.hypot(p1[0] - p0[0], p1[1] - p0[1])
+        for j in range(NUM_INTERP_PER_SEGMENT):
+            t = j / NUM_INTERP_PER_SEGMENT
+            x = p0[0] + t * (p1[0] - p0[0])
+            y = p0[1] + t * (p1[1] - p0[1])
+            points.append((x, y))
+            if len(points) > 1:
+                dx = points[-1][0] - points[-2][0]
+                dy = points[-1][1] - points[-2][1]
+                cum_s.append(cum_s[-1] + np.hypot(dx, dy))
+    return np.array(points), np.array(cum_s)
 
 
-def _generate_centerline():
-    s_values = np.linspace(0, TRACK_LENGTH, NUM_CENTERLINE_POINTS, endpoint=False)
-    xy = np.array([_centerline_point(s) for s in s_values])
-    return xy, s_values
-
-
-CENTERLINE_XY, CENTERLINE_S = _generate_centerline()
+CENTERLINE_XY, CENTERLINE_S = _densify_midpoints()
+TRACK_LENGTH = CENTERLINE_S[-1] + np.hypot(
+    CENTERLINE_XY[0, 0] - CENTERLINE_XY[-1, 0],
+    CENTERLINE_XY[0, 1] - CENTERLINE_XY[-1, 1],
+)
 
 
 def project_to_centerline(x, y):
@@ -108,3 +102,68 @@ def project_to_centerline(x, y):
     dists_sq = dx * dx + dy * dy
     idx = np.argmin(dists_sq)
     return float(CENTERLINE_S[idx]), float(np.sqrt(dists_sq[idx]))
+
+
+# ---------------------------------------------------------------------------
+# Track boundary checking — uses line segments between consecutive cones
+# ---------------------------------------------------------------------------
+# Half track width = average distance from centerline to boundary midpoint
+HALF_TRACK_WIDTH = 1.5  # nominal — actual varies but cones are ~1.5m from midpoints
+
+# Precompute segment arrays for vectorized distance computation
+# Each boundary is N segments: starts[i] -> ends[i]
+_BLUE_STARTS = BLUE_CONES
+_BLUE_ENDS = np.roll(BLUE_CONES, -1, axis=0)
+_YELLOW_STARTS = YELLOW_CONES
+_YELLOW_ENDS = np.roll(YELLOW_CONES, -1, axis=0)
+# Combined: all boundary segments (blue + yellow)
+_ALL_STARTS = np.vstack([_BLUE_STARTS, _YELLOW_STARTS])
+_ALL_ENDS = np.vstack([_BLUE_ENDS, _YELLOW_ENDS])
+_ALL_DX = _ALL_ENDS[:, 0] - _ALL_STARTS[:, 0]
+_ALL_DY = _ALL_ENDS[:, 1] - _ALL_STARTS[:, 1]
+_ALL_LEN_SQ = _ALL_DX ** 2 + _ALL_DY ** 2
+
+
+def _point_in_polygon_np(px, py, poly_x, poly_y):
+    """Vectorized ray casting point-in-polygon."""
+    n = len(poly_x)
+    x1 = poly_x
+    y1 = poly_y
+    x2 = np.roll(poly_x, -1)
+    y2 = np.roll(poly_y, -1)
+    # Edge crosses the ray from (px, py) rightward?
+    cond1 = (y1 > py) != (y2 > py)
+    x_intersect = (x2 - x1) * (py - y1) / (y2 - y1) + x1
+    cond2 = px < x_intersect
+    crossings = np.sum(cond1 & cond2)
+    return crossings % 2 == 1
+
+
+def is_inside_track(x, y):
+    """Check if (x,y) is between the blue and yellow cone boundaries."""
+    in_yellow = _point_in_polygon_np(x, y, YELLOW_CONES[:, 0], YELLOW_CONES[:, 1])
+    in_blue = _point_in_polygon_np(x, y, BLUE_CONES[:, 0], BLUE_CONES[:, 1])
+    return bool(in_yellow and not in_blue)
+
+
+def dist_to_boundary(x, y):
+    """Signed distance to nearest track boundary segment.
+
+    Returns
+    -------
+    float
+        Positive if inside the track, negative if outside.
+        Magnitude is the distance to the nearest boundary line segment.
+    """
+    # Vectorized distance to all segments at once
+    apx = x - _ALL_STARTS[:, 0]
+    apy = y - _ALL_STARTS[:, 1]
+    t = (apx * _ALL_DX + apy * _ALL_DY) / _ALL_LEN_SQ
+    t = np.clip(t, 0.0, 1.0)
+    proj_x = _ALL_STARTS[:, 0] + t * _ALL_DX
+    proj_y = _ALL_STARTS[:, 1] + t * _ALL_DY
+    dists = np.hypot(x - proj_x, y - proj_y)
+    d = float(dists.min())
+    if not is_inside_track(x, y):
+        return -d
+    return d

@@ -28,11 +28,16 @@ def main():
                         help="Comma-separated controller types: "
                              "geometric, neural, neural_v2")
     parser.add_argument("--fitness", type=str, default="v1",
-                        choices=["v1", "v2", "v3"],
+                        choices=["v1", "v2", "v3", "v4"],
                         help="v1: distance+laps, v2: lap-time, "
-                             "v3: track-keeping (nonlinear CTE penalty)")
+                             "v3: track-keeping (nonlinear CTE penalty), "
+                             "v4: boundary-aware (terminate outside cones)")
     parser.add_argument("--seed", type=str, default="",
                         help="Path to JSON weights to seed population with")
+    parser.add_argument("--sigma", type=float, default=0.1,
+                        help="Initial mutation sigma (default: 0.1, use 0.01-0.02 for fine-tuning)")
+    parser.add_argument("--sigma-min", type=float, default=0.005,
+                        help="Minimum mutation sigma")
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
@@ -42,17 +47,22 @@ def main():
     for name in names:
         cls = CONTROLLER_MAP[name]
         ga = GeneticAlgorithm(cls, pop_size=args.pop_size,
-                              fitness_mode=args.fitness)
+                              fitness_mode=args.fitness,
+                              mutation_sigma=args.sigma,
+                              sigma_min=args.sigma_min)
         if args.seed:
             import numpy as np
             with open(args.seed) as f:
                 seed_data = json.load(f)
             seed_genes = np.array(seed_data["genes"], dtype=np.float64)
-            # Inject seed into first few slots with small mutations
+            # Seed entire population around the seed weights
+            seed_sigma = args.sigma
+            n_seed = min(args.pop_size, max(20, args.pop_size // 2))
             ga.population[0] = seed_genes.copy()
-            for i in range(1, min(10, args.pop_size)):
-                ga.population[i] = seed_genes + np.random.randn(len(seed_genes)) * 0.05
+            for i in range(1, n_seed):
+                ga.population[i] = seed_genes + np.random.randn(len(seed_genes)) * seed_sigma
             print(f"  Seeded {name} from {args.seed} (fitness={seed_data.get('fitness', '?')})")
+            print(f"  {n_seed}/{args.pop_size} slots seeded, σ={seed_sigma}")
         gas[name] = ga
 
     print(f"Training {list(gas.keys())} | "

@@ -4,13 +4,13 @@ import numpy as np
 
 from track import (BLUE_CONES, YELLOW_CONES, ORANGE_CONES,
                    TRACK_LENGTH, SPAWN_X, SPAWN_Y, SPAWN_YAW,
-                   project_to_centerline)
+                   HALF_TRACK_WIDTH,
+                   project_to_centerline, dist_to_boundary, is_inside_track)
 from kart_model import KartState, step as kart_step, DT
 from perception import perceive
 
 MAX_STEPS = 2000
-OFF_TRACK_THRESHOLD = 2.0  # m from centerline (track is 1.5m half-width)
-HALF_TRACK_WIDTH = 1.5     # m — same as in controllers.py
+BOUNDARY_DANGER = 0.5  # m — penalize when kart is within this distance of boundary
 
 
 def run_episode(controller, max_steps=MAX_STEPS, fitness_mode="v1"):
@@ -18,16 +18,17 @@ def run_episode(controller, max_steps=MAX_STEPS, fitness_mode="v1"):
 
     Parameters
     ----------
-    fitness_mode : "v1" | "v2" | "v3"
+    fitness_mode : "v1" | "v2" | "v3" | "v4"
         v1: distance + lap bonus - CTE + speed (original)
         v2: lap-time based — completing laps fast is king
         v3: track-keeping first — nonlinear CTE⁴ penalty, reward progress,
             speed only matters through completing laps
+        v4: boundary-aware — terminate if outside track, penalize near boundary
 
     Returns
     -------
     dict with keys: fitness, distance, laps, avg_cte, avg_speed, steps, time,
-                    max_cte, cte_penalty
+                    max_cte, cte_penalty, min_boundary_dist, boundary_penalty
     """
     state = KartState(SPAWN_X, SPAWN_Y, SPAWN_YAW, speed=0.0)
     controller.reset()
@@ -41,6 +42,8 @@ def run_episode(controller, max_steps=MAX_STEPS, fitness_mode="v1"):
     total_cte4 = 0.0   # sum of (cte / half_track)^4 per step
     max_cte = 0.0
     total_speed = 0.0
+    boundary_penalty = 0.0
+    min_boundary_dist = float('inf')
     steps = 0
 
     for _ in range(max_steps):
@@ -75,8 +78,18 @@ def run_episode(controller, max_steps=MAX_STEPS, fitness_mode="v1"):
         cte_norm = cte / HALF_TRACK_WIDTH
         total_cte4 += cte_norm ** 4
 
-        if cte > OFF_TRACK_THRESHOLD:
+        # Boundary check — distance to nearest boundary line segment
+        bd = dist_to_boundary(state.x, state.y)
+        if bd < min_boundary_dist:
+            min_boundary_dist = bd
+
+        # Outside track → terminate
+        if bd < 0:
             break
+
+        # Close to boundary → accumulate penalty
+        if bd < BOUNDARY_DANGER:
+            boundary_penalty += (1.0 - bd / BOUNDARY_DANGER) ** 2
 
     avg_cte = total_cte / steps if steps else 0.0
     avg_speed = total_speed / steps if steps else 0.0
@@ -84,15 +97,13 @@ def run_episode(controller, max_steps=MAX_STEPS, fitness_mode="v1"):
     laps = int(total_distance / TRACK_LENGTH) if total_distance > 0 else 0
     time = steps * DT
 
-    if fitness_mode == "v3":
-        # Primary: progress along track
-        # Penalty: TOTAL (not avg) cte^4 scaled per step — accumulates fast
-        #   At cte=0.75m (half of half-width): 0.0625 per step
-        #   At cte=1.5m  (at cones):           1.0 per step
-        #   At cte=2.0m  (just outside):        3.16 per step
-        # Over 2000 steps, even small deviations add up significantly
-        cte_penalty = 0.5 * total_cte4  # total, not avg — punishes duration too
-        # Extra cliff penalty if kart ever exceeded cone boundary
+    if fitness_mode == "v4":
+        # Boundary-aware fitness:
+        #   CTE^4 keeps kart centered, boundary_penalty keeps it off the edges
+        cte_penalty = 1.5 * total_cte4
+        fitness = total_distance + 200.0 * laps - cte_penalty - 50.0 * boundary_penalty
+    elif fitness_mode == "v3":
+        cte_penalty = 0.5 * total_cte4
         if max_cte > HALF_TRACK_WIDTH:
             cte_penalty += 200.0 * ((max_cte / HALF_TRACK_WIDTH) ** 2)
         fitness = total_distance + 200.0 * laps - cte_penalty
@@ -116,5 +127,7 @@ def run_episode(controller, max_steps=MAX_STEPS, fitness_mode="v1"):
         "steps": steps,
         "time": time,
         "max_cte": max_cte,
-        "cte_penalty": cte_penalty if fitness_mode == "v3" else 0.0,
+        "cte_penalty": cte_penalty if fitness_mode in ("v3", "v4") else 0.0,
+        "min_boundary_dist": min_boundary_dist,
+        "boundary_penalty": boundary_penalty,
     }
