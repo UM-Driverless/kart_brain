@@ -1,0 +1,133 @@
+"""Simulation loop: perceive → control → step physics → check termination."""
+
+import numpy as np
+
+from track import (BLUE_CONES, YELLOW_CONES, ORANGE_CONES,
+                   TRACK_LENGTH, SPAWN_X, SPAWN_Y, SPAWN_YAW,
+                   HALF_TRACK_WIDTH,
+                   project_to_centerline, dist_to_boundary, is_inside_track)
+from kart_model import KartState, step as kart_step, DT
+from perception import perceive
+
+MAX_STEPS = 2000
+BOUNDARY_DANGER = 0.5  # m — penalize when kart is within this distance of boundary
+
+
+def run_episode(controller, max_steps=MAX_STEPS, fitness_mode="v1"):
+    """Run one full episode.
+
+    Parameters
+    ----------
+    fitness_mode : "v1" | "v2" | "v3" | "v4"
+        v1: distance + lap bonus - CTE + speed (original)
+        v2: lap-time based — completing laps fast is king
+        v3: track-keeping first — nonlinear CTE⁴ penalty, reward progress,
+            speed only matters through completing laps
+        v4: boundary-aware — terminate if outside track, penalize near boundary
+
+    Returns
+    -------
+    dict with keys: fitness, distance, laps, avg_cte, avg_speed, steps, time,
+                    max_cte, cte_penalty, min_boundary_dist, boundary_penalty
+    """
+    state = KartState(SPAWN_X, SPAWN_Y, SPAWN_YAW, speed=0.0)
+    controller.reset()
+
+    # Check if controller accepts current_speed (v2)
+    wants_speed = hasattr(controller, '_last_speed')
+
+    s_prev, _ = project_to_centerline(state.x, state.y)
+    total_distance = 0.0
+    total_cte = 0.0
+    total_cte4 = 0.0   # sum of (cte / half_track)^4 per step
+    max_cte = 0.0
+    total_speed = 0.0
+    boundary_penalty = 0.0
+    min_boundary_dist = float('inf')
+    steps = 0
+
+    for _ in range(max_steps):
+        visible = perceive(state, BLUE_CONES, YELLOW_CONES, ORANGE_CONES)
+
+        if wants_speed:
+            steer, speed_cmd = controller.control(visible,
+                                                  current_speed=state.speed)
+        else:
+            steer, speed_cmd = controller.control(visible)
+
+        state = kart_step(state, steer, speed_cmd)
+        steps += 1
+
+        s_cur, cte = project_to_centerline(state.x, state.y)
+
+        # Incremental distance (handles wrap-around)
+        ds = s_cur - s_prev
+        if ds > TRACK_LENGTH / 2:
+            ds -= TRACK_LENGTH
+        elif ds < -TRACK_LENGTH / 2:
+            ds += TRACK_LENGTH
+        total_distance += ds
+        s_prev = s_cur
+
+        total_cte += cte
+        total_speed += state.speed
+        if cte > max_cte:
+            max_cte = cte
+
+        # Nonlinear: (cte / half_track)^4 — explodes when approaching edges
+        cte_norm = cte / HALF_TRACK_WIDTH
+        total_cte4 += cte_norm ** 4
+
+        # Boundary check — distance to nearest boundary line segment
+        bd = dist_to_boundary(state.x, state.y)
+        if bd < min_boundary_dist:
+            min_boundary_dist = bd
+
+        # Outside track → terminate
+        if bd < 0:
+            break
+
+        # Close to boundary → accumulate penalty
+        if bd < BOUNDARY_DANGER:
+            boundary_penalty += (1.0 - bd / BOUNDARY_DANGER) ** 2
+
+    avg_cte = total_cte / steps if steps else 0.0
+    avg_speed = total_speed / steps if steps else 0.0
+    avg_cte4 = total_cte4 / steps if steps else 0.0
+    laps = int(total_distance / TRACK_LENGTH) if total_distance > 0 else 0
+    time = steps * DT
+
+    if fitness_mode == "v4":
+        # Boundary-aware fitness:
+        #   CTE^4 keeps kart centered, boundary_penalty keeps it off the edges
+        cte_penalty = 1.5 * total_cte4
+        fitness = total_distance + 200.0 * laps - cte_penalty - 50.0 * boundary_penalty
+    elif fitness_mode == "v3":
+        cte_penalty = 0.5 * total_cte4
+        if max_cte > HALF_TRACK_WIDTH:
+            cte_penalty += 200.0 * ((max_cte / HALF_TRACK_WIDTH) ** 2)
+        fitness = total_distance + 200.0 * laps - cte_penalty
+    elif fitness_mode == "v2":
+        if laps >= 1:
+            fitness = 500.0 * laps - time - 5.0 * avg_cte
+        else:
+            fitness = total_distance - 2.0 * avg_cte
+    else:
+        fitness = (total_distance
+                   + 100.0 * laps
+                   - 2.0 * avg_cte
+                   + 0.5 * avg_speed)
+
+    return {
+        "fitness": fitness,
+        "distance": total_distance,
+        "laps": laps,
+        "avg_cte": avg_cte,
+        "avg_speed": avg_speed,
+        "steps": steps,
+        "time": time,
+        "max_cte": max_cte,
+        "cte_penalty": cte_penalty if fitness_mode in ("v3", "v4") else 0.0,
+        "min_boundary_dist": min_boundary_dist,
+        "boundary_penalty": boundary_penalty,
+    }

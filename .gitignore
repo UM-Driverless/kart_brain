@@ -1,3 +1,5 @@
 build/
 install/
 log/
+src/zed-ros2-wrapper/
+__pycache__/

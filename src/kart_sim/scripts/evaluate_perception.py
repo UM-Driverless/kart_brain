@@ -8,8 +8,8 @@ precision, recall, and detection rate per class.
 Usage:
     python3 evaluate_perception.py \
         --frames /tmp/gazebo_frames \
-        --weights ~/kart_sw/models/perception/yolo/best_adri.pt \
-        --world-sdf ~/kart_sw/install/kart_sim/share/kart_sim/worlds/fs_track.sdf
+        --weights ~/kart_brain/models/perception/yolo/best_adri.pt \
+        --world-sdf ~/kart_brain/install/kart_sim/share/kart_sim/worlds/fs_track.sdf
 
 The camera is assumed to be at the kart's start pose (20, 0, yaw=π/2) for
 the first frame. If an odom log is available, pass --odom-csv for per-frame

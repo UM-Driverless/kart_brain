@@ -131,14 +131,14 @@ class PerfectPerceptionNode(Node):
         # TF broadcaster for camera frame
         self.tf_broadcaster = TransformBroadcaster(self)
 
-        # Subscribe to kart odometry (from Gazebo bridge)
+        # Subscribe to ground-truth odometry (world frame, no drift)
         odom_qos = QoSProfile(
             depth=10,
             reliability=ReliabilityPolicy.BEST_EFFORT,
             durability=DurabilityPolicy.VOLATILE,
         )
         self.odom_sub = self.create_subscription(
-            Odometry, "/model/kart/odometry", self._on_odom, odom_qos
+            Odometry, "/model/kart/odom_gt", self._on_odom, odom_qos
         )
 
         # Current kart pose
@@ -151,24 +151,26 @@ class PerfectPerceptionNode(Node):
         self.timer = self.create_timer(1.0 / publish_rate, self._publish)
 
     def _on_odom(self, msg: Odometry):
-        # Odom is in the kart's start frame — transform to world frame
-        odom_x = msg.pose.pose.position.x
-        odom_y = msg.pose.pose.position.y
+        # Ground-truth odom is already in world frame
+        self.kart_x = msg.pose.pose.position.x
+        self.kart_y = msg.pose.pose.position.y
         q = msg.pose.pose.orientation
         siny_cosp = 2.0 * (q.w * q.z + q.x * q.y)
         cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z)
-        odom_yaw = math.atan2(siny_cosp, cosy_cosp)
-
-        # Transform odom pose to world frame
-        cos_s = math.cos(self.start_yaw)
-        sin_s = math.sin(self.start_yaw)
-        self.kart_x = self.start_x + odom_x * cos_s - odom_y * sin_s
-        self.kart_y = self.start_y + odom_x * sin_s + odom_y * cos_s
-        self.kart_yaw = self.start_yaw + odom_yaw
+        self.kart_yaw = math.atan2(siny_cosp, cosy_cosp)
         self.got_odom = True
 
     def _publish(self):
         if not self.got_odom or not self.cones:
+            self.get_logger().info(
+                f"Skipping: got_odom={self.got_odom} cones={len(self.cones)}",
+                throttle_duration_sec=2.0,
+            )
+            # Still publish empty array so controller knows we're alive
+            out = Detection3DArray()
+            out.header.stamp = self.get_clock().now().to_msg()
+            out.header.frame_id = self.camera_frame
+            self.pub.publish(out)
             return
 
         now = self.get_clock().now().to_msg()
@@ -204,25 +206,25 @@ class PerfectPerceptionNode(Node):
             if abs(angle) > half_fov:
                 continue
 
-            # In camera optical frame: Z=forward, X=right, Y=down
-            # But perception nodes expect camera_link frame where X=forward
-            # So publish in camera_link frame directly
+            # Publish in camera optical frame (Z=forward, X=right, Y=down)
+            # to match what cone_depth_localizer outputs.
+            # cone_follower expects this convention and converts internally.
             det = Detection3D()
             det.header = out.header
 
             hyp = ObjectHypothesisWithPose()
             hyp.hypothesis.class_id = cone["class_id"]
             hyp.hypothesis.score = 1.0
-            hyp.pose.pose.position.x = cx
-            hyp.pose.pose.position.y = cy
-            hyp.pose.pose.position.z = cone["z"]
+            hyp.pose.pose.position.x = -cy   # optical X = right = -left
+            hyp.pose.pose.position.y = -(cone["z"] - self.cam_z)  # optical Y = down
+            hyp.pose.pose.position.z = cx     # optical Z = forward
             hyp.pose.pose.orientation.w = 1.0
             det.results.append(hyp)
 
             bbox = BoundingBox3D()
-            bbox.center.position.x = cx
-            bbox.center.position.y = cy
-            bbox.center.position.z = cone["z"]
+            bbox.center.position.x = -cy
+            bbox.center.position.y = -(cone["z"] - self.cam_z)
+            bbox.center.position.z = cx
             bbox.center.orientation.w = 1.0
             bbox.size.x = 0.25
             bbox.size.y = 0.25
@@ -232,6 +234,10 @@ class PerfectPerceptionNode(Node):
             out.detections.append(det)
 
         self.pub.publish(out)
+        self.get_logger().info(
+            f"Published {len(out.detections)} cones  kart=({self.kart_x:.1f},{self.kart_y:.1f}) yaw={math.degrees(self.kart_yaw):.0f}°",
+            throttle_duration_sec=2.0,
+        )
 
         # Broadcast TF: odom -> base_link -> camera_link
         t = TransformStamped()

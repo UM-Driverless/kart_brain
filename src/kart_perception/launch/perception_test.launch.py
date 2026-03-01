@@ -12,8 +12,8 @@ def generate_launch_description():
     )
     weights_arg = DeclareLaunchArgument(
         "weights",
-        default_value="models/perception/yolo/best_adri.pt",
-        description="Path to YOLOv5 weights.",
+        default_value="models/perception/yolo/nava_yolov11_2026_02.pt",
+        description="Path to YOLO weights (.pt).",
     )
 
     image_source = Node(

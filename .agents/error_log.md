@@ -62,3 +62,90 @@ Tracks mistakes made during development and the prevention mechanisms added. Eve
 **Prevention added:**
 - Use `ssh <host> 'echo "0" | sudo -S <command>'` for all sudo operations
 - Documented in `.agents/vm_environment.md` and `.agents/orin_environment.md`
+
+## 2026-02-22 - Wrong IP for y540 laptop, wasted time on SSH setup
+**What happened:** The laptop (y540) was given IP 10.7.20.136 but DHCP had assigned 10.7.20.138. Spent multiple attempts trying to connect to the wrong IP. Also referenced IPs without labeling which machine they belonged to, causing confusion.
+**Prevention added:**
+- Rule: **All machines on Robots_urjc use DHCP — IPs can change.** Always verify the current IP with `hostname -I` on the target machine before attempting SSH.
+- Rule: **Always label IPs with the machine name** (e.g., "Mac at 10.7.20.28", "Orin at 10.7.20.142") — never mention bare IPs.
+- Rule: **SSH config hostnames are the source of truth** (`ssh orin`, `ssh y540`). When an IP changes, update `~/.ssh/config` on the Mac.
+
+## 2026-02-22 - SSH server not installed on fresh Ubuntu laptop
+**What happened:** Tried to SSH into the y540 laptop but got "Connection refused" — openssh-server was not installed. Cannot install it remotely without SSH access.
+**Prevention added:**
+- Rule: When setting up a new machine for remote access, the **first step is always installing openssh-server** on it physically: `sudo apt install -y openssh-server`
+
+## 2026-02-22 - ZED SDK installer breaks pip permissions
+**What happened:** The ZED SDK installer runs pip as root to install `pyzed`, `numpy`, and `cython` into `/usr/local/lib/python3.10/dist-packages/`. This leaves `.dist-info` directories owned by root with no world-read permission. Subsequent `pip3 install` by the normal user fails with `PermissionError: [Errno 13] Permission denied: '/usr/local/lib/python3.10/dist-packages/pyzed-4.2.dist-info'`.
+**Prevention added:**
+- After installing ZED SDK, always run: `sudo chmod -R a+rX /usr/local/lib/python3.10/dist-packages/`
+- Rule: When any installer runs pip as root (sudo), check permissions on dist-packages afterward.
+
+## 2026-02-22 - PyTorch installed as CPU-only (Jetson AI Lab index unreachable)
+**What happened:** `pip3 install --extra-index-url https://pypi.jetson-ai-lab.dev/jp6/cu126 torch torchvision` was run, but the Jetson AI Lab index didn't resolve (DNS failure: `Name or service not known`). Pip silently fell back to PyPI and installed the standard `torch 2.10.0+cpu` wheel (no CUDA). Also pulled `numpy 2.2.6`, breaking `pyzed` and `cv2`.
+**Prevention added:**
+- Rule: After installing PyTorch, **always verify CUDA is available**: `python3 -c "import torch; print(torch.version.cuda, torch.cuda.is_available())"`
+- Rule: After any `--force-reinstall` of torch, **immediately pin numpy**: `pip3 install 'numpy<2'`
+- Rule: Check the extra-index-url is reachable before relying on it: `curl -sI https://pypi.jetson-ai-lab.dev/`
+- Added to TODO.md as a blocked task
+
+## 2026-02-25 - cuBLAS fails on Jetson: pip cuBLAS 12.9 vs system CUDA 12.6
+**What happened:** `torch.matmul` and any operation using cuBLAS on the Orin crashed with `CUBLAS_STATUS_ALLOC_FAILED when calling cublasCreate(handle)`. Element-wise CUDA ops (add, mul) worked fine. Root cause: `pip install torch` from `pypi.jetson-ai-lab.io` pulled in `nvidia-cublas-cu12==12.9.1.4`, which is incompatible with the Jetson's system CUDA 12.6. The pip libs were placed first in `LD_LIBRARY_PATH`, shadowing the working system cuBLAS.
+**Prevention added:**
+- In `run_live.sh` and `run_live_3d.sh`, prepend `/usr/local/cuda-12.6/targets/aarch64-linux/lib` to `LD_LIBRARY_PATH` **before** pip NVIDIA libs, so system cuBLAS 12.6 is loaded instead of pip cuBLAS 12.9
+- Rule: **On Jetson, system CUDA libs must always precede pip-installed NVIDIA libs** in `LD_LIBRARY_PATH`. The pip packages are built for generic CUDA and may not work on Jetson's integrated GPU.
+- Rule: After installing torch on Jetson, always test: `python3 -c "import torch; a=torch.randn(4,4,device='cuda'); print(a@a)"`
+
+## 2026-02-25 - YOLOv5 torch.hub broken with torch 2.10
+**What happened:** `torch.hub.load("ultralytics/yolov5", "custom", ...)` downloads YOLOv5 source from GitHub. The cached AutoShape preprocessing code is incompatible with torch 2.10 — it passes raw numpy arrays to `conv2d()` instead of converting to tensors. Tried: numpy input, PIL input, manual tensor input — all failed differently. Clearing the hub cache didn't help.
+**Prevention added:**
+- Migrated `yolo_detector_node.py` to use the `ultralytics` pip package API (`from ultralytics import YOLO`) as primary, with torch.hub as fallback for legacy YOLOv5 weights
+- Switched default weights to YOLOv11 (`nava_yolov11_2026_02.pt`) which works natively with `ultralytics`
+- Rule: **Prefer the `ultralytics` pip package over `torch.hub.load`** for any YOLO inference. The pip package is actively maintained and handles device management, preprocessing, and model fusion internally.
+
+## 2026-02-24 - Multiple failed torch install attempts on Jetson Orin
+**What happened:** Original JetPack PyTorch 2.5.0a0 (NVIDIA build, CUDA working) was overwritten by CPU-only torch during dependency installation. Four recovery attempts failed:
+1. `pip install torch==2.5.0 --index-url nvidia.../jp/v60` — no wheels found
+2. NVIDIA Jetson wheel `torch-2.5.0a0+nv24.08` — CUDA works but torchvision 0.20 from PyPI overrides it with CPU torch
+3. `--no-deps` reinstall of NV wheel + torchvision 0.20 from PyPI — `torchvision::nms does not exist`
+4. `torch+torchvision from pypi.jetson-ai-lab.io/jp6/cu126` — torch 2.10 + torchvision 0.25, CUDA works, but YOLOv5 incompatible + cuBLAS version mismatch
+**Prevention added:**
+- Rule: **Never `pip install torch` without `--extra-index-url` pointing to the Jetson wheel index.** Always use `pypi.jetson-ai-lab.io/jp6/cu126` for JetPack 6 + CUDA 12.6.
+- Rule: **After installing torch, immediately verify**: `python3 -c "import torch; print(torch.__version__, torch.cuda.is_available()); a=torch.randn(2,2).cuda(); print(a@a)"`
+- Rule: **Pin `numpy<2`** after any torch install (pyzed and cv2 need numpy 1.x)
+- Rule: **Never install torchvision from PyPI on Jetson** — it pulls CPU-only torch as a dependency. Always install from the same Jetson index.
+
+## 2026-02-28 - Failed to visually validate trajectory — kart exited track undetected
+**What happened:** After training a neural_v2 controller with cone-proximity penalty, I generated a trajectory plot and claimed "0 boundary violations" and "trajectory stays between cones." The user immediately spotted that the trajectory went far outside the cone boundaries — reaching y=30 while cones only go to y=23. The root cause was twofold: (1) the centerline in `track.py` was a hardcoded R=20 oval that didn't match actual cone positions (7–8.5m beyond outermost cones at curves), and (2) the "validation" only checked distance to individual cone *points*, not to the boundary *line segments* between cones. The kart exited the track in the gaps between cones without approaching any single cone. Actual analysis showed 1324/2001 steps were outside the track polygon.
+**Prevention added:**
+- Rule: **Always visually inspect generated plots with critical eyes.** Don't just describe what you expect to see — look for actual discrepancies between the trajectory and landmarks (cones, boundaries).
+- Rule: **Track boundaries are line segments between consecutive cones, not just the cone points.** Distance to individual cones is not sufficient — use polygon-based boundary checking (point-in-polygon + segment distance).
+- Rewrote `track.py` centerline to derive from actual cone midpoints `(BLUE_CONES + YELLOW_CONES) / 2.0` instead of hardcoded oval geometry.
+- Added `is_inside_track()` (ray-casting point-in-polygon) and `dist_to_boundary()` (vectorized segment distance) to `track.py`.
+- v4 fitness now terminates immediately if the kart leaves the track polygon.
+
+## 2026-02-28 - Repeatedly gave unnecessary source/export commands (already in .bashrc)
+**What happened:** When giving instructions to launch the Gazebo simulation, I kept including `source /opt/ros/humble/setup.bash`, `source install/setup.bash`, and `export IGN_GAZEBO_RESOURCE_PATH=...` as manual steps. The user pointed out that all of these are already in `.bashrc`. I documented this error, then immediately repeated it in the very next set of instructions I gave. Root cause: CLAUDE.md and `.agents/simulation.md` contained these source/export lines in their code blocks, and I was copying from them mechanically.
+**Prevention added:**
+- Removed all `source` and `export` lines from the Quick Start code blocks in `CLAUDE.md` and `.agents/simulation.md`
+- Added explicit note in `CLAUDE.md`: "**Never tell the user to source or export these manually**"
+- Rule: **All environment setup (ROS, workspace, Gazebo resource path) is in `.bashrc` on every machine.** Just run commands directly — never prepend source/export boilerplate.
+
+## 2026-02-28 - Wrote to wrong file instead of asking where it goes
+**What happened:** User asked to add a FAQ entry to "kart_docs". Instead of recognizing this as the separate `~/repos/kart_docs/` repository (which has a `docs/faq.md`), I assumed the file didn't exist and wrote the content to `.agents/README.md` in `kart_brain` — the wrong repo entirely. I should have asked the user for the path or searched for the `kart_docs` repo.
+**Prevention added:**
+- Rule: **If the user references a file or location you don't recognize, ASK — don't assume and write to a different location.** Writing to the wrong file is worse than asking a clarifying question.
+- Rule: **The `kart_docs` repo lives at `~/repos/kart_docs/`** and has its own `docs/faq.md`. It is a separate repo from `kart_brain`.
+
+## 2026-02-28 - Created files but didn't rebuild workspace before telling user to launch
+**What happened:** Created `hairpin_track.sdf` and updated `simulation.launch.py` on the Mac, then told the user the launch commands without rebuilding the workspace. The `install(DIRECTORY worlds/ ...)` in CMakeLists only copies files at build time, so the installed share directory still had the old files. User launched and got the old oval track.
+**Prevention added:**
+- Rule: **After creating or modifying any file under `src/`, scp the files to the VM and rebuild there.** Files in `src/` are not used directly — only the installed copies in `install/` are. Don't just tell the user — do it yourself via SSH.
+- Rule: **Development happens on Mac, but Gazebo runs on the VM.** Use `scp` to copy changed files, then `ssh utm "source /opt/ros/humble/setup.bash && cd ~/kart_brain && colcon build --packages-select <pkg>"` to rebuild. Note: `bash -lc` does NOT source `.bashrc` on the VM (non-interactive guard), so always source ROS explicitly in SSH commands.
+
+## 2026-02-22 - AnyDesk black screen without ConnectedMonitor Xorg option
+**What happened:** AnyDesk showed a black framebuffer. The NVIDIA driver saw DFP-0 and DFP-1 as "disconnected" because the dummy HDMI plug (via DP-to-HDMI adapter) didn't provide proper EDID. Without a connected monitor, Xorg had no screen.
+**Prevention added:**
+- Created `/etc/X11/xorg.conf.d/10-virtual-display.conf` with `Option "ConnectedMonitor" "DFP-0"` to force the driver to create a framebuffer on DisplayPort regardless of EDID detection
+- Also set `Option "AllowEmptyInitialConfiguration" "true"` and `Virtual 1920 1080`
+- Documented in kart_docs orin-setup.md

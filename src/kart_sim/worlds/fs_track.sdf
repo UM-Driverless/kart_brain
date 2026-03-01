@@ -166,5 +166,12 @@
     <include><uri>model://cone_orange_big</uri><name>orange_sf_2</name><pose>22.0 -0.5 0.252 0 0 0</pose></include>
     <include><uri>model://cone_orange_big</uri><name>orange_sf_3</name><pose>22.0 0.5 0.252 0 0 0</pose></include>
 
+    <!-- Default camera: top-down view of the full track -->
+    <gui fullscreen="0">
+      <camera name="user_camera">
+        <pose>1.49 3.35 19.0 0 1.395 0</pose>
+      </camera>
+    </gui>
+
   </world>
 </sdf>

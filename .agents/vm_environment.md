@@ -97,9 +97,46 @@ Note: `ssh -t` for pseudo-terminal allocation does NOT work from non-interactive
 
 ### Mesa / Rendering
 - `mesa-utils`, `libegl1-mesa-dev`, `libgles2-mesa-dev`
-- OGRE2 headless rendering works via EGL on LLVMpipe
-- OpenGL 4.5 (Compatibility) via llvmpipe — sufficient for OGRE2 headless
-- No hardware acceleration — keep resolutions low
+- `scrot` — X11 screenshot (only captures X root window, NOT Wayland windows)
+- `gnome-screenshot` — GNOME/Wayland screenshot tool (captures full compositor output)
+- `xdotool`, `ydotool` — input simulation (limited effectiveness on Wayland)
+- OpenGL 4.5 (Compatibility Profile) Mesa 23.2.1 via llvmpipe — sufficient for OGRE2
+- OpenGL ES 3.2 also available
+- No hardware GPU acceleration — all rendering is CPU (llvmpipe)
+
+### Gazebo Rendering: GUI vs Headless
+- **GUI on DISPLAY=:0 works** — Gazebo renders correctly via the X11/GLX path using llvmpipe. This is how the user runs it interactively via the UTM window.
+- **Headless EGL does NOT work** — `ign gazebo -s --headless-rendering` fails because the EGL PBuffer path cannot initialize without a DRI2 device. Error: `OGRE EXCEPTION: OpenGL 3.3 is not supported` (EGL falls back to a software path that doesn't expose GL 3.3).
+- **Summary**: For rendering (camera sensors, GUI), Gazebo MUST run on a display (`:0` or Xvfb). Headless server-only mode (`-s`) works for physics but NOT for camera images.
+
+### Taking Screenshots Over SSH
+
+**IMPORTANT**: The VM runs **GNOME on Wayland** (not X11). This affects screenshot tools:
+- `scrot` only sees the X11 root window (black) — useless for Wayland windows
+- `gnome-screenshot` captures the full Wayland compositor output — **this is the tool to use**
+- Requires the DBUS session bus address to be set
+
+**Launching Gazebo for screenshots** — must use `gnome-terminal` to launch in the desktop session (not `nohup` via SSH, which causes Ignition Transport issues where the bridge can't connect):
+```bash
+# 1. Launch Gazebo via gnome-terminal on the desktop (runs IN the GNOME session)
+ssh utm "export DISPLAY=:0; export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus; \
+  gnome-terminal -- bash -c 'ros2 launch kart_sim simulation.launch.py gui:=true track:=autocross 2>&1 | tee /tmp/gz.log; exec bash'"
+
+# 2. Wait 40-50s for Gazebo to fully render
+
+# 3. Take screenshot (requires DBUS session bus)
+ssh utm "export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus; \
+  gnome-screenshot -f /tmp/screenshot.png"
+
+# 4. Copy to Mac
+scp utm:/tmp/screenshot.png /tmp/screenshot.png
+```
+
+**Known issues with remote screenshots:**
+- If GNOME Activities overlay is open, the screenshot captures the overlay instead of the desktop. There is no reliable way to dismiss Activities over SSH on Wayland.
+- `ydotool` can send input events but GNOME's Activities search bar intercepts them as text, not as key presses (e.g., Escape key becomes "1" character).
+- If Activities gets stuck, the user must click in the UTM window to dismiss it manually.
+- `nohup ros2 launch ... &` via SSH causes Ignition Transport disconnection — the bridge sees `blues=0 yellows=0`. Always use `gnome-terminal --` to launch within the GNOME session.
 
 ## Disk Space Concerns
 Gazebo + ros-gz consumed ~3-4 GB. With ~17 GB free, there's room for additional packages but be mindful of:
@@ -114,6 +151,7 @@ Gazebo + ros-gz consumed ~3-4 GB. With ~17 GB free, there's room for additional 
 
 ## Known Quirks
 1. **SSH connections can hang** if a background process (like Gazebo) holds the terminal. Always redirect output (`&>/tmp/log`) when running long processes over SSH.
-2. **X11 forwarding is slow** — expect 1-5 FPS for GUI apps like RViz or Gazebo GUI.
+2. **GNOME runs on Wayland** — X11 tools (scrot, xdotool) don't work. Use `gnome-screenshot` with `DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus`. X11 forwarding (`ssh -X`) is very slow (1-5 FPS).
 3. **No systemd user services** — cron or manual launches only.
 4. **Colcon build is slow** for C++ packages (~minutes) but fast for Python packages (~seconds).
+5. **Gazebo needs DISPLAY=:0 for rendering** — headless EGL fails on llvmpipe. Camera sensors won't publish images without a display. The UTM virtual display `:0` always works.

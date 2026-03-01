@@ -12,30 +12,37 @@ Before making any changes to the kart_brain workspace, consult:
 
 ### Jetson Orin (Real Hardware)
 - **Connection:** `ssh orin` (WiFi 10.7.20.142) or AnyDesk
-- **Workspace:** `/mnt/data/kart_brain`
+- **Workspace:** `~/kart_brain`
 - **Camera:** ZED 2 stereo (USB)
 - **sudo password:** `0`
 - **Full details:** `.agents/orin_environment.md`
 
 ### UTM VM (Simulation)
 - **Connection:** `ssh utm` (192.168.65.2)
-- **Workspace:** `~/kart_sw/`
+- **Workspace:** `~/kart_brain/`
 - **Simulator:** Gazebo Fortress (headless, CPU rendering)
 - **sudo password:** `0`
 - **Full details:** `.agents/vm_environment.md`
 
+## Critical Rules
+- **Environment is in `.bashrc`** — ROS, workspace, and `IGN_GAZEBO_RESOURCE_PATH` are all sourced in `.bashrc` on every machine. **Never tell the user to source or export these manually.**
+- **After creating/modifying files under `src/`, scp them to the VM and rebuild via SSH — don't just tell the user.** Use: `scp <files> utm:~/kart_brain/...` then `ssh utm "source /opt/ros/humble/setup.bash && cd ~/kart_brain && colcon build --packages-select <pkg>"`. Note: `.bashrc` is NOT sourced in non-interactive SSH — always source ROS explicitly.
+- **Gazebo Fortress uses `ign` CLI**, not `gz`. Message types are `ignition.msgs.*`, not `gz.msgs.*`.
+- **No `<cone>` geometry** in SDF — use `<cylinder>` instead (Fortress limitation).
+- **Odom is relative to spawn** — always account for the kart's initial world position.
+- **No hardware GPU on the VM** — CPU rendering via llvmpipe (OpenGL 4.5). Gazebo GUI works on `DISPLAY=:0` but headless EGL fails. Keep camera resolution at 640x360.
+- When something goes wrong, document it in `.agents/error_log.md`.
+
 ## Build & Run
 ```bash
 # Build everything
-source /opt/ros/humble/setup.bash
-cd /mnt/data/kart_brain && colcon build
-source install/setup.bash
+cd ~/kart_brain && colcon build
 
 # Build single package
 colcon build --packages-select kart_perception
 
 # Live perception on Orin
-/mnt/data/kart_brain/run_live.sh
+~/kart_brain/run_live.sh
 
 # Simulation in VM
 ros2 launch kart_sim simulation.launch.py
@@ -57,6 +64,12 @@ Used everywhere — YOLO class names, Detection messages, visualization:
 - `yellow_cone` — right track boundary
 - `orange_cone` — start/finish markers
 - `large_orange_cone` — large start/finish markers
+
+## Documentation Rules
+- **Document every decision.** When a version is chosen, a workaround is found, or an approach is selected over alternatives, write it down in the relevant `.agents/` file with the date and reasoning.
+- **Document every error.** When something breaks or doesn't work as expected, add it to `.agents/error_log.md` with what happened and the prevention rule.
+- **Document every version.** Software versions, SDK versions, wheel sources, compatibility notes — all go in `.agents/orin_environment.md` or the relevant environment file.
+- **Official docs live in kart_docs.** The `.agents/` directory is for AI agent workflow. Official project documentation goes to https://github.com/UM-Driverless/kart_docs.
 
 ## Commit Protocol
 1. `git status` — check what will be committed

@@ -376,6 +376,7 @@ int SerialDriver::process_byte(uint8_t byte)
         case State::TYPE:
             type_ = byte;
             index_ = 0;
+            payload_.clear();
             state_ = (len_ == 0) ? State::CRC : State::PAYLOAD;
             break;
 

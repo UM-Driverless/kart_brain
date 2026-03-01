@@ -7,16 +7,13 @@ The simulation uses **Gazebo Fortress** (ign-gazebo 6.16.0, the Ignition-era nam
 ## Quick Start
 
 ```bash
-source /opt/ros/humble/setup.bash
-source ~/kart_sw/install/setup.bash
-export IGN_GAZEBO_RESOURCE_PATH=$(ros2 pkg prefix kart_sim)/share/kart_sim/models
-
 # Full simulation with perfect perception (ground truth)
 ros2 launch kart_sim simulation.launch.py
 
 # With YOLO vision pipeline instead
 ros2 launch kart_sim simulation.launch.py use_perception:=true use_perfect_perception:=false
 ```
+> **Note:** ROS, the workspace, and `IGN_GAZEBO_RESOURCE_PATH` are all in `.bashrc`. No manual sourcing needed.
 
 ## Manual Step-by-Step Launch
 

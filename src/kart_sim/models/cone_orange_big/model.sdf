@@ -13,14 +13,6 @@
           </mesh>
         </geometry>
       </visual>
-      <collision name="collision">
-        <geometry>
-          <cylinder>
-            <radius>0.1425</radius>
-            <length>0.505</length>
-          </cylinder>
-        </geometry>
-      </collision>
     </link>
   </model>
 </sdf>

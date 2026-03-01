@@ -15,8 +15,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--weights",
-        default="models/perception/yolo/best_adri.pt",
-        help="Path to YOLOv5 weights.",
+        default="models/perception/yolo/nava_yolov11_2026_02.pt",
+        help="Path to YOLO weights (.pt).",
     )
     parser.add_argument(
         "--output",
@@ -50,20 +50,17 @@ def main() -> int:
         return 2
 
     try:
-        import torch
+        from ultralytics import YOLO
+        model = YOLO(str(weights))
+        results = model(
+            str(source), imgsz=args.imgsz, conf=args.conf, iou=0.45,
+            save=True, project=str(output.parent), name=output.name,
+        )
+        print(f"Saved annotated results to {output}")
     except ImportError:
-        print("Missing torch. Install with: pip install torch torchvision", file=sys.stderr)
+        print("Missing ultralytics. Install with: pip install ultralytics", file=sys.stderr)
         return 2
 
-    # Torch Hub pulls the YOLOv5 repo on first run; cached afterwards.
-    model = torch.hub.load("ultralytics/yolov5", "custom", path=str(weights))
-    model.conf = args.conf
-    model.iou = 0.45
-    model.imgsz = args.imgsz
-
-    results = model(str(source))
-    results.save(save_dir=str(output))
-    print(f"Saved annotated results to {output}")
     return 0
 
 

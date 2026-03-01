@@ -1,0 +1,199 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <world name="autocross_track">
+
+    <physics name="sim" type="ode">
+      <max_step_size>0.004</max_step_size>
+      <real_time_update_rate>250</real_time_update_rate>
+      <real_time_factor>1</real_time_factor>
+    </physics>
+
+    <plugin filename="ignition-gazebo-sensors-system" name="ignition::gazebo::systems::Sensors"><render_engine>ogre2</render_engine></plugin>
+    <plugin filename="ignition-gazebo-scene-broadcaster-system" name="ignition::gazebo::systems::SceneBroadcaster"></plugin>
+    <plugin filename="ignition-gazebo-physics-system" name="ignition::gazebo::systems::Physics"></plugin>
+    <plugin filename="ignition-gazebo-user-commands-system" name="ignition::gazebo::systems::UserCommands"></plugin>
+
+    <light name="sun" type="directional">
+      <cast_shadows>false</cast_shadows>
+      <pose>0 0 20 0 0 0</pose>
+      <diffuse>0.9 0.9 0.9 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <direction>-0.3 0.2 -1.0</direction>
+    </light>
+
+    <scene>
+      <ambient>0.6 0.6 0.6 1</ambient>
+      <background>0.4 0.6 0.9 1</background>
+    </scene>
+
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><plane><normal>0 0 1</normal><size>200 200</size></plane></geometry>
+          <surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface>
+        </collision>
+        <visual name="visual">
+          <geometry><plane><normal>0 0 1</normal><size>200 200</size></plane></geometry>
+          <material><ambient>0.3 0.3 0.3 1</ambient><diffuse>0.3 0.3 0.3 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <include><uri>model://kart</uri><name>kart</name><pose>30.0000 -7.5000 0 0 0 1.5708</pose></include>
+
+    <!-- Blue cones (left of travel) -->
+    <include><uri>model://cone_blue</uri><name>blue_00</name><pose>28.5830 -11.5080 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_01</name><pose>28.9885 -9.3395 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_02</name><pose>28.9336 -6.7340 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_03</name><pose>28.6584 -3.9689 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_04</name><pose>28.4591 -0.9604 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_05</name><pose>28.4862 1.8596 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_06</name><pose>28.5746 4.6454 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_07</name><pose>28.5442 7.3071 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_08</name><pose>28.2564 9.7982 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_09</name><pose>27.6322 12.3339 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_10</name><pose>26.7041 14.7004 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_11</name><pose>25.3945 17.0259 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_12</name><pose>23.7810 19.1137 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_13</name><pose>21.7653 21.0360 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_14</name><pose>19.5266 22.5202 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_15</name><pose>17.3052 23.3615 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_16</name><pose>15.0749 23.4989 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_17</name><pose>12.7876 22.8779 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_18</name><pose>10.1366 21.7553 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_19</name><pose>7.3276 20.7618 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_20</name><pose>4.0878 20.5926 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_21</name><pose>1.0821 21.6103 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_22</name><pose>-1.4960 22.9822 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_23</name><pose>-3.9141 24.1543 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_24</name><pose>-5.9578 24.5778 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_25</name><pose>-8.1588 24.2137 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_26</name><pose>-10.4533 23.2021 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_27</name><pose>-12.8794 21.6776 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_28</name><pose>-15.2467 19.9385 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_29</name><pose>-17.4492 18.2396 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_30</name><pose>-19.7235 16.5268 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_31</name><pose>-21.9975 14.9802 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_32</name><pose>-24.5202 13.5634 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_33</name><pose>-27.0659 12.4338 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_34</name><pose>-29.6466 11.3622 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_35</name><pose>-32.0493 10.1899 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_36</name><pose>-34.1020 8.7963 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_37</name><pose>-35.9270 6.9232 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_38</name><pose>-37.3141 4.7725 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_39</name><pose>-38.2260 2.3776 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_40</name><pose>-38.5016 0.0859 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_41</name><pose>-38.1187 -2.2203 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_42</name><pose>-37.1272 -4.5370 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_43</name><pose>-35.7132 -6.7420 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_44</name><pose>-33.9376 -8.9368 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_45</name><pose>-32.0859 -10.9090 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_46</name><pose>-30.0782 -12.7605 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_47</name><pose>-28.0451 -14.3602 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_48</name><pose>-25.8319 -15.8191 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_49</name><pose>-23.4980 -17.0739 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_50</name><pose>-21.1230 -18.0960 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_51</name><pose>-18.5575 -18.9642 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_52</name><pose>-16.0035 -19.6232 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_53</name><pose>-13.3051 -20.1252 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_54</name><pose>-10.6741 -20.4412 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_55</name><pose>-7.9414 -20.6030 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_56</name><pose>-5.1889 -20.6339 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_57</name><pose>-2.5065 -20.5893 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_58</name><pose>0.3016 -20.5191 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_59</name><pose>3.0456 -20.4807 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_60</name><pose>5.9206 -20.5267 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_61</name><pose>8.6569 -20.6407 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_62</name><pose>11.4119 -20.7070 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_63</name><pose>14.0700 -20.5940 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_64</name><pose>16.5487 -20.2086 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_65</name><pose>19.0560 -19.4801 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_66</name><pose>21.3948 -18.4607 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_67</name><pose>23.7036 -17.0799 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_68</name><pose>25.7624 -15.4507 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_blue</uri><name>blue_69</name><pose>27.4925 -13.5401 0.1517 0 0 0</pose></include>
+
+    <!-- Yellow cones (right of travel) -->
+    <include><uri>model://cone_yellow</uri><name>yellow_00</name><pose>31.4170 -12.4920 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_01</name><pose>31.9825 -9.5278 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_02</name><pose>31.9241 -6.4952 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_03</name><pose>31.6432 -3.6674 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_04</name><pose>31.4584 -0.8965 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_05</name><pose>31.4847 1.7664 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_06</name><pose>31.5739 4.5818 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_07</name><pose>31.5395 7.4745 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_08</name><pose>31.2100 10.3237 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_09</name><pose>30.4915 13.2421 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_10</name><pose>29.4173 15.9805 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_11</name><pose>27.8948 18.6838 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_12</name><pose>26.0157 21.1152 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_13</name><pose>23.6497 23.3704 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_14</name><pose>20.9143 25.1799 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_15</name><pose>17.9783 26.2850 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_16</name><pose>14.7147 26.4772 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_17</name><pose>11.7193 25.6812 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_18</name><pose>8.9596 24.5148 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_19</name><pose>6.6093 23.6745 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_20</name><pose>4.5789 23.5521 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_21</name><pose>2.3776 24.3162 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_22</name><pose>-0.0542 25.6130 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_23</name><pose>-2.8544 26.9609 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_24</name><pose>-5.9219 27.5776 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_25</name><pose>-9.0715 27.0715 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_26</name><pose>-11.8920 25.8345 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_27</name><pose>-14.5930 24.1400 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_28</name><pose>-17.0653 22.3245 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_29</name><pose>-19.2823 20.6144 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_30</name><pose>-21.4842 18.9557 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_31</name><pose>-23.5944 17.5199 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_32</name><pose>-25.8445 16.2553 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_33</name><pose>-28.2113 15.2065 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_34</name><pose>-30.8417 14.1139 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_35</name><pose>-33.5225 12.8033 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_36</name><pose>-36.0172 11.1055 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_37</name><pose>-38.2774 8.7874 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_38</name><pose>-39.9844 6.1400 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_39</name><pose>-41.1356 3.1086 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_40</name><pose>-41.5010 0.0270 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_41</name><pose>-40.9886 -3.0942 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_42</name><pose>-39.7624 -5.9707 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_43</name><pose>-38.1339 -8.5141 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_44</name><pose>-36.1912 -10.9170 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_45</name><pose>-34.2011 -13.0364 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_46</name><pose>-32.0246 -15.0434 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_47</name><pose>-29.8033 -16.7910 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_48</name><pose>-27.3707 -18.3944 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_49</name><pose>-24.7979 -19.7777 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_50</name><pose>-22.1966 -20.8973 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_51</name><pose>-19.4092 -21.8408 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_52</name><pose>-16.6525 -22.5521 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_53</name><pose>-13.7551 -23.0913 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_54</name><pose>-10.9406 -23.4293 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_55</name><pose>-8.0374 -23.6014 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_56</name><pose>-5.1704 -23.6338 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_57</name><pose>-2.4346 -23.5884 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_58</name><pose>0.3695 -23.5183 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_59</name><pose>3.0526 -23.4807 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_60</name><pose>5.8156 -23.5249 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_61</name><pose>8.5347 -23.6382 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_62</name><pose>11.4151 -23.7070 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_63</name><pose>14.3480 -23.5810 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_64</name><pose>17.1955 -23.1380 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_65</name><pose>20.0789 -22.3004 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_66</name><pose>22.7635 -21.1303 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_67</name><pose>25.4066 -19.5497 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_68</name><pose>27.7896 -17.6621 0.1517 0 0 0</pose></include>
+    <include><uri>model://cone_yellow</uri><name>yellow_69</name><pose>29.9213 -15.3012 0.1517 0 0 0</pose></include>
+
+    <!-- Orange big cones at start/finish -->
+    <include><uri>model://cone_orange_big</uri><name>orange_00</name><pose>29.0000 -8.0000 0.252 0 0 0</pose></include>
+    <include><uri>model://cone_orange_big</uri><name>orange_01</name><pose>29.0000 -7.0000 0.252 0 0 0</pose></include>
+    <include><uri>model://cone_orange_big</uri><name>orange_02</name><pose>31.0000 -8.0000 0.252 0 0 0</pose></include>
+    <include><uri>model://cone_orange_big</uri><name>orange_03</name><pose>31.0000 -7.0000 0.252 0 0 0</pose></include>
+
+    <gui fullscreen="0"><camera name="user_camera"><pose>-4.8 1.9 73.5 0 1.5708 0</pose></camera></gui>
+
+  </world>
+</sdf>
+
