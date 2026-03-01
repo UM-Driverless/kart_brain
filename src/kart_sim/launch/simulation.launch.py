@@ -33,7 +33,8 @@ from launch_ros.actions import Node
 # Track configs: world_file_basename, world_name, (start_x, start_y, start_yaw)
 _TRACKS = {
     "oval": ("fs_track.sdf", "fs_track", 20.0, 0.0, 1.5708),
-    "hairpin": ("hairpin_track.sdf", "hairpin_track", 16.0, 5.0, 1.5708),
+    "hairpin": ("hairpin_track.sdf", "hairpin_track", 20.0, -5.5, 1.5708),
+    "autocross": ("autocross_track.sdf", "autocross_track", 30.0, -7.5, 1.5708),
 }
 
 

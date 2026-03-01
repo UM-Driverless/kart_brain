@@ -30,7 +30,7 @@ Before making any changes to the kart_brain workspace, consult:
 - **Gazebo Fortress uses `ign` CLI**, not `gz`. Message types are `ignition.msgs.*`, not `gz.msgs.*`.
 - **No `<cone>` geometry** in SDF — use `<cylinder>` instead (Fortress limitation).
 - **Odom is relative to spawn** — always account for the kart's initial world position.
-- **No GPU on the VM** — keep camera resolution at 640x360, disable shadows, use headless rendering.
+- **No hardware GPU on the VM** — CPU rendering via llvmpipe (OpenGL 4.5). Gazebo GUI works on `DISPLAY=:0` but headless EGL fails. Keep camera resolution at 640x360.
 - When something goes wrong, document it in `.agents/error_log.md`.
 
 ## Build & Run

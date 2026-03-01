@@ -1,13 +1,158 @@
-"""Track definition: cone positions and centerline from fs_track.sdf."""
+"""Track definitions: cone positions, centerline, and boundary geometry.
+
+Each track is a ``Track`` dataclass that precomputes its centerline and
+boundary segments in ``__post_init__``.  Two tracks are provided:
+
+* **oval** — the original fs_track.sdf oval (R≈20 m)
+* **hairpin** — complex track with left sweeper + S-chicane (both L/R turns)
+
+Backward-compatible module-level aliases (``BLUE_CONES``, ``CENTERLINE_XY``,
+``project_to_centerline``, …) point to ``OVAL_TRACK`` so that files that
+have not been updated yet continue to work.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Tuple
 
 import numpy as np
 
+NUM_INTERP_PER_SEGMENT = 100
+
+
 # ---------------------------------------------------------------------------
-# Cone positions extracted from fs_track.sdf  (x, y) — z is ground-level
-# Blue = inner boundary, Yellow = outer boundary, Orange = start/finish
+# Track dataclass
 # ---------------------------------------------------------------------------
 
-BLUE_CONES = np.array([
+@dataclass
+class Track:
+    """A closed track defined by blue (left-of-travel) and yellow (right-of-travel) cones."""
+
+    name: str
+    blue_cones: np.ndarray
+    yellow_cones: np.ndarray
+    orange_cones: np.ndarray
+    spawn_x: float
+    spawn_y: float
+    spawn_yaw: float
+    half_track_width: float = 1.5
+
+    # Computed in __post_init__
+    centerline_xy: np.ndarray = field(init=False, repr=False)
+    centerline_s: np.ndarray = field(init=False, repr=False)
+    track_length: float = field(init=False)
+    _all_starts: np.ndarray = field(init=False, repr=False)
+    _all_ends: np.ndarray = field(init=False, repr=False)
+    _all_dx: np.ndarray = field(init=False, repr=False)
+    _all_dy: np.ndarray = field(init=False, repr=False)
+    _all_len_sq: np.ndarray = field(init=False, repr=False)
+
+    def __post_init__(self):
+        self._compute_centerline()
+        self._compute_boundary_segments()
+
+    # ── centerline ────────────────────────────────────────────────────
+
+    def _compute_centerline(self):
+        midpoints = (self.blue_cones + self.yellow_cones) / 2.0
+        spawn_dists = np.hypot(
+            midpoints[:, 0] - self.spawn_x,
+            midpoints[:, 1] - self.spawn_y,
+        )
+        spawn_idx = int(np.argmin(spawn_dists))
+        ordered = np.roll(midpoints, -spawn_idx, axis=0)
+
+        n = len(ordered)
+        points = []
+        cum_s = [0.0]
+        for i in range(n):
+            p0 = ordered[i]
+            p1 = ordered[(i + 1) % n]
+            for j in range(NUM_INTERP_PER_SEGMENT):
+                t = j / NUM_INTERP_PER_SEGMENT
+                x = p0[0] + t * (p1[0] - p0[0])
+                y = p0[1] + t * (p1[1] - p0[1])
+                points.append((x, y))
+                if len(points) > 1:
+                    dx = points[-1][0] - points[-2][0]
+                    dy = points[-1][1] - points[-2][1]
+                    cum_s.append(cum_s[-1] + np.hypot(dx, dy))
+
+        self.centerline_xy = np.array(points)
+        self.centerline_s = np.array(cum_s)
+        self.track_length = self.centerline_s[-1] + np.hypot(
+            self.centerline_xy[0, 0] - self.centerline_xy[-1, 0],
+            self.centerline_xy[0, 1] - self.centerline_xy[-1, 1],
+        )
+
+    # ── boundary segments ─────────────────────────────────────────────
+
+    def _compute_boundary_segments(self):
+        blue_starts = self.blue_cones
+        blue_ends = np.roll(self.blue_cones, -1, axis=0)
+        yellow_starts = self.yellow_cones
+        yellow_ends = np.roll(self.yellow_cones, -1, axis=0)
+        self._all_starts = np.vstack([blue_starts, yellow_starts])
+        self._all_ends = np.vstack([blue_ends, yellow_ends])
+        self._all_dx = self._all_ends[:, 0] - self._all_starts[:, 0]
+        self._all_dy = self._all_ends[:, 1] - self._all_starts[:, 1]
+        self._all_len_sq = self._all_dx ** 2 + self._all_dy ** 2
+
+    # ── projection ────────────────────────────────────────────────────
+
+    def project_to_centerline(self, x: float, y: float) -> Tuple[float, float]:
+        """Nearest centerline point → (arc-length *s*, cross-track error)."""
+        dx = self.centerline_xy[:, 0] - x
+        dy = self.centerline_xy[:, 1] - y
+        dists_sq = dx * dx + dy * dy
+        idx = np.argmin(dists_sq)
+        return float(self.centerline_s[idx]), float(np.sqrt(dists_sq[idx]))
+
+    # ── boundary queries ──────────────────────────────────────────────
+
+    @staticmethod
+    def _point_in_polygon(px, py, poly_x, poly_y) -> bool:
+        y1 = poly_y
+        y2 = np.roll(poly_y, -1)
+        x1 = poly_x
+        x2 = np.roll(poly_x, -1)
+        cond1 = (y1 > py) != (y2 > py)
+        x_intersect = (x2 - x1) * (py - y1) / (y2 - y1) + x1
+        cond2 = px < x_intersect
+        return int(np.sum(cond1 & cond2)) % 2 == 1
+
+    def is_inside_track(self, x: float, y: float) -> bool:
+        """True if (x, y) is on the track surface (between boundaries).
+
+        Uses a combined polygon: yellow cones forward + blue cones reversed.
+        This correctly handles tracks where blue/yellow swap inner/outer
+        (e.g. tracks with both left and right turns).
+        """
+        poly_x = np.concatenate([self.yellow_cones[:, 0], self.blue_cones[::-1, 0]])
+        poly_y = np.concatenate([self.yellow_cones[:, 1], self.blue_cones[::-1, 1]])
+        return self._point_in_polygon(x, y, poly_x, poly_y)
+
+    def dist_to_boundary(self, x: float, y: float) -> float:
+        """Signed distance to nearest boundary segment (+inside, −outside)."""
+        apx = x - self._all_starts[:, 0]
+        apy = y - self._all_starts[:, 1]
+        t = (apx * self._all_dx + apy * self._all_dy) / self._all_len_sq
+        t = np.clip(t, 0.0, 1.0)
+        proj_x = self._all_starts[:, 0] + t * self._all_dx
+        proj_y = self._all_starts[:, 1] + t * self._all_dy
+        dists = np.hypot(x - proj_x, y - proj_y)
+        d = float(dists.min())
+        if not self.is_inside_track(x, y):
+            return -d
+        return d
+
+
+# ---------------------------------------------------------------------------
+# Oval track — extracted from fs_track.sdf
+# ---------------------------------------------------------------------------
+
+_OVAL_BLUE = np.array([
     # Right straight (inner, x=18.5)
     [18.5, -10], [18.5, -5], [18.5, 0], [18.5, 5], [18.5, 10],
     # Top curve (inner, r=18.5 from center (0,10))
@@ -18,7 +163,7 @@ BLUE_CONES = np.array([
     [-16.02, -14.25], [-9.25, -18.02], [0, -20], [9.25, -18.02], [16.02, -14.25],
 ])
 
-YELLOW_CONES = np.array([
+_OVAL_YELLOW = np.array([
     # Right straight (outer, x=21.5)
     [21.5, -10], [21.5, -5], [21.5, 0], [21.5, 5], [21.5, 10],
     # Top curve (outer, r=21.5 from center (0,10))
@@ -29,141 +174,203 @@ YELLOW_CONES = np.array([
     [-18.62, -16.75], [-10.75, -20.62], [0, -23], [10.75, -20.62], [18.62, -16.75],
 ])
 
-ORANGE_CONES = np.array([
+_OVAL_ORANGE = np.array([
     [18.0, -0.5], [18.0, 0.5], [22.0, -0.5], [22.0, 0.5],
 ])
 
-# ---------------------------------------------------------------------------
-# Track geometry — derived from actual cone positions
-# ---------------------------------------------------------------------------
-# The centerline is the midpoint between corresponding blue/yellow cones,
-# densified by linear interpolation.  Direction: counterclockwise.
-# Start/finish at (20, 0) facing +Y.
-
-# Spawn pose
-SPAWN_X, SPAWN_Y, SPAWN_YAW = 20.0, 0.0, np.pi / 2
-
-# ---------------------------------------------------------------------------
-# Centerline from cone midpoints
-# ---------------------------------------------------------------------------
-# Midpoint vertices (20 points forming a closed polygon)
-_MIDPOINTS = (BLUE_CONES + YELLOW_CONES) / 2.0
-
-# Find the index of the midpoint closest to spawn (20, 0)
-_spawn_dists = np.hypot(_MIDPOINTS[:, 0] - SPAWN_X, _MIDPOINTS[:, 1] - SPAWN_Y)
-_spawn_idx = int(np.argmin(_spawn_dists))
-
-# Reorder midpoints so index 0 is the one nearest the spawn
-_MIDPOINTS_ORDERED = np.roll(_MIDPOINTS, -_spawn_idx, axis=0)
-
-NUM_INTERP_PER_SEGMENT = 100  # interpolation points between each pair of vertices
-
-
-def _densify_midpoints():
-    """Densify the midpoint polygon into a smooth centerline."""
-    n = len(_MIDPOINTS_ORDERED)
-    points = []
-    cum_s = [0.0]
-    for i in range(n):
-        p0 = _MIDPOINTS_ORDERED[i]
-        p1 = _MIDPOINTS_ORDERED[(i + 1) % n]
-        seg_len = np.hypot(p1[0] - p0[0], p1[1] - p0[1])
-        for j in range(NUM_INTERP_PER_SEGMENT):
-            t = j / NUM_INTERP_PER_SEGMENT
-            x = p0[0] + t * (p1[0] - p0[0])
-            y = p0[1] + t * (p1[1] - p0[1])
-            points.append((x, y))
-            if len(points) > 1:
-                dx = points[-1][0] - points[-2][0]
-                dy = points[-1][1] - points[-2][1]
-                cum_s.append(cum_s[-1] + np.hypot(dx, dy))
-    return np.array(points), np.array(cum_s)
-
-
-CENTERLINE_XY, CENTERLINE_S = _densify_midpoints()
-TRACK_LENGTH = CENTERLINE_S[-1] + np.hypot(
-    CENTERLINE_XY[0, 0] - CENTERLINE_XY[-1, 0],
-    CENTERLINE_XY[0, 1] - CENTERLINE_XY[-1, 1],
+OVAL_TRACK = Track(
+    name="oval",
+    blue_cones=_OVAL_BLUE,
+    yellow_cones=_OVAL_YELLOW,
+    orange_cones=_OVAL_ORANGE,
+    spawn_x=20.0, spawn_y=0.0, spawn_yaw=np.pi / 2,
+    half_track_width=1.5,
 )
 
 
-def project_to_centerline(x, y):
-    """Find nearest centerline point.
+# ---------------------------------------------------------------------------
+# Complex track — left sweeper + S-chicane with both LEFT and RIGHT turns
+# ---------------------------------------------------------------------------
+# Generated from centerline waypoints via cubic spline + perpendicular offsets.
+# Blue = left-of-travel, Yellow = right-of-travel.
+# The S-chicane section forces the kart to make RIGHT turns, preventing
+# overfitting to counterclockwise-only loops.
+# Track width = 3 m.  ~90 m centerline length.  Fits in ~40×35 m area.
 
-    Returns
-    -------
-    s : float
-        Distance along the track (0 .. TRACK_LENGTH).
-    cte : float
-        Cross-track error (distance from centerline).
+
+def _generate_cones_from_centerline(waypoints, half_width=1.5, n_cones=25):
+    """Generate blue (left) and yellow (right) cones from centerline waypoints.
+
+    Args:
+        waypoints: (N, 2) closed loop (first != last, auto-closed).
+        half_width: offset distance from centerline to each boundary.
+        n_cones: number of cones per side.
+
+    Returns:
+        (blue_cones, yellow_cones) each (n_cones, 2).
     """
-    dx = CENTERLINE_XY[:, 0] - x
-    dy = CENTERLINE_XY[:, 1] - y
-    dists_sq = dx * dx + dy * dy
-    idx = np.argmin(dists_sq)
-    return float(CENTERLINE_S[idx]), float(np.sqrt(dists_sq[idx]))
+    from scipy.interpolate import CubicSpline
+
+    pts = np.vstack([waypoints, waypoints[0:1]])
+    diffs = np.diff(pts, axis=0)
+    seg_len = np.hypot(diffs[:, 0], diffs[:, 1])
+    t = np.zeros(len(pts))
+    t[1:] = np.cumsum(seg_len)
+
+    cs_x = CubicSpline(t, pts[:, 0], bc_type='periodic')
+    cs_y = CubicSpline(t, pts[:, 1], bc_type='periodic')
+
+    n_fine = 2000
+    t_fine = np.linspace(0, t[-1], n_fine, endpoint=False)
+    cx = cs_x(t_fine)
+    cy = cs_y(t_fine)
+
+    dx = cs_x(t_fine, 1)
+    dy = cs_y(t_fine, 1)
+    mag = np.hypot(dx, dy)
+    nx = -dy / mag   # left-of-travel normal
+    ny = dx / mag
+
+    blue_x = cx + half_width * nx
+    blue_y = cy + half_width * ny
+    yellow_x = cx - half_width * nx
+    yellow_y = cy - half_width * ny
+
+    idx = np.linspace(0, n_fine, n_cones, endpoint=False).astype(int)
+    blue = np.column_stack([blue_x[idx], blue_y[idx]])
+    yellow = np.column_stack([yellow_x[idx], yellow_y[idx]])
+    return blue, yellow
+
+
+# Centerline waypoints: oval + gentle chicane on right straight (forces right turns)
+# The chicane offsets the track 5m to the right then back, creating clear R/L turns.
+_COMPLEX_WAYPOINTS = np.array([
+    # Right straight heading north (x=20)
+    [20, -8],
+    [20, -3],
+    # Chicane: gentle 5m jog right
+    [25, 1],
+    [25, 5],
+    # Chicane: jog back left
+    [20, 9],
+    [20, 13],
+    # Top curve (left turn)
+    [14, 20],
+    [6, 23],
+    [-6, 23],
+    [-14, 20],
+    # Left straight heading south (x=-20)
+    [-20, 13],
+    [-20, 5],
+    [-20, -3],
+    [-20, -8],
+    # Bottom curve (left turn)
+    [-14, -15],
+    [-6, -18],
+    [6, -18],
+    [14, -15],
+])
+
+_COMPLEX_BLUE, _COMPLEX_YELLOW = _generate_cones_from_centerline(
+    _COMPLEX_WAYPOINTS, half_width=1.5, n_cones=50,
+)
+
+_COMPLEX_ORANGE = np.array([
+    [19.0, -6.0], [19.0, -5.0], [21.0, -6.0], [21.0, -5.0],
+])
+
+HAIRPIN_TRACK = Track(
+    name="hairpin",
+    blue_cones=_COMPLEX_BLUE,
+    yellow_cones=_COMPLEX_YELLOW,
+    orange_cones=_COMPLEX_ORANGE,
+    spawn_x=20.0, spawn_y=-5.5, spawn_yaw=np.pi / 2,
+    half_track_width=1.5,
+)
 
 
 # ---------------------------------------------------------------------------
-# Track boundary checking — uses line segments between consecutive cones
+# Autocross track — larger (~80×60 m), gentler curves, mixed L/R turns
 # ---------------------------------------------------------------------------
-# Half track width = average distance from centerline to boundary midpoint
-HALF_TRACK_WIDTH = 1.5  # nominal — actual varies but cones are ~1.5m from midpoints
+# Inspired by Formula Student autocross layouts.
+# ~250 m lap, minimum turn radius ~10 m, track width 3 m.
 
-# Precompute segment arrays for vectorized distance computation
-# Each boundary is N segments: starts[i] -> ends[i]
-_BLUE_STARTS = BLUE_CONES
-_BLUE_ENDS = np.roll(BLUE_CONES, -1, axis=0)
-_YELLOW_STARTS = YELLOW_CONES
-_YELLOW_ENDS = np.roll(YELLOW_CONES, -1, axis=0)
-# Combined: all boundary segments (blue + yellow)
-_ALL_STARTS = np.vstack([_BLUE_STARTS, _YELLOW_STARTS])
-_ALL_ENDS = np.vstack([_BLUE_ENDS, _YELLOW_ENDS])
-_ALL_DX = _ALL_ENDS[:, 0] - _ALL_STARTS[:, 0]
-_ALL_DY = _ALL_ENDS[:, 1] - _ALL_STARTS[:, 1]
-_ALL_LEN_SQ = _ALL_DX ** 2 + _ALL_DY ** 2
+_AUTOCROSS_WAYPOINTS = np.array([
+    # Start/finish straight heading north (east side)
+    [30, -12],
+    [30,  -2],
+    [30,   8],
+    # Right turn into northern section (R~15m)
+    [25,  20],
+    [15,  25],
+    # Gentle S-chicane (direction changes)
+    [ 5,  22],
+    [-5,  26],
+    [-15, 22],
+    # Left sweeper heading west
+    [-25, 15],
+    [-35, 10],
+    # Wide left curve at west end (R~15m)
+    [-40,  0],
+    [-35, -10],
+    [-25, -18],
+    # Bottom straight heading east
+    [-10, -22],
+    [  5, -22],
+    [ 15, -22],
+    # Wide right curve back to start
+    [ 25, -18],
+])
+
+_AUTOCROSS_BLUE, _AUTOCROSS_YELLOW = _generate_cones_from_centerline(
+    _AUTOCROSS_WAYPOINTS, half_width=1.5, n_cones=70,
+)
+
+_AUTOCROSS_ORANGE = np.array([
+    [29.0, -8.0], [29.0, -7.0], [31.0, -8.0], [31.0, -7.0],
+])
+
+AUTOCROSS_TRACK = Track(
+    name="autocross",
+    blue_cones=_AUTOCROSS_BLUE,
+    yellow_cones=_AUTOCROSS_YELLOW,
+    orange_cones=_AUTOCROSS_ORANGE,
+    spawn_x=30.0, spawn_y=-7.5, spawn_yaw=np.pi / 2,
+    half_track_width=1.5,
+)
 
 
-def _point_in_polygon_np(px, py, poly_x, poly_y):
-    """Vectorized ray casting point-in-polygon."""
-    n = len(poly_x)
-    x1 = poly_x
-    y1 = poly_y
-    x2 = np.roll(poly_x, -1)
-    y2 = np.roll(poly_y, -1)
-    # Edge crosses the ray from (px, py) rightward?
-    cond1 = (y1 > py) != (y2 > py)
-    x_intersect = (x2 - x1) * (py - y1) / (y2 - y1) + x1
-    cond2 = px < x_intersect
-    crossings = np.sum(cond1 & cond2)
-    return crossings % 2 == 1
+# ---------------------------------------------------------------------------
+# Registry
+# ---------------------------------------------------------------------------
+
+TRACKS = {
+    "oval": OVAL_TRACK,
+    "hairpin": HAIRPIN_TRACK,
+    "autocross": AUTOCROSS_TRACK,
+}
 
 
-def is_inside_track(x, y):
-    """Check if (x,y) is between the blue and yellow cone boundaries."""
-    in_yellow = _point_in_polygon_np(x, y, YELLOW_CONES[:, 0], YELLOW_CONES[:, 1])
-    in_blue = _point_in_polygon_np(x, y, BLUE_CONES[:, 0], BLUE_CONES[:, 1])
-    return bool(in_yellow and not in_blue)
+def get_track(name: str) -> Track:
+    """Look up a track by name. Raises KeyError if not found."""
+    return TRACKS[name]
 
 
-def dist_to_boundary(x, y):
-    """Signed distance to nearest track boundary segment.
+# ---------------------------------------------------------------------------
+# Backward-compatible module-level aliases → OVAL_TRACK
+# ---------------------------------------------------------------------------
 
-    Returns
-    -------
-    float
-        Positive if inside the track, negative if outside.
-        Magnitude is the distance to the nearest boundary line segment.
-    """
-    # Vectorized distance to all segments at once
-    apx = x - _ALL_STARTS[:, 0]
-    apy = y - _ALL_STARTS[:, 1]
-    t = (apx * _ALL_DX + apy * _ALL_DY) / _ALL_LEN_SQ
-    t = np.clip(t, 0.0, 1.0)
-    proj_x = _ALL_STARTS[:, 0] + t * _ALL_DX
-    proj_y = _ALL_STARTS[:, 1] + t * _ALL_DY
-    dists = np.hypot(x - proj_x, y - proj_y)
-    d = float(dists.min())
-    if not is_inside_track(x, y):
-        return -d
-    return d
+BLUE_CONES = OVAL_TRACK.blue_cones
+YELLOW_CONES = OVAL_TRACK.yellow_cones
+ORANGE_CONES = OVAL_TRACK.orange_cones
+SPAWN_X = OVAL_TRACK.spawn_x
+SPAWN_Y = OVAL_TRACK.spawn_y
+SPAWN_YAW = OVAL_TRACK.spawn_yaw
+CENTERLINE_XY = OVAL_TRACK.centerline_xy
+CENTERLINE_S = OVAL_TRACK.centerline_s
+TRACK_LENGTH = OVAL_TRACK.track_length
+HALF_TRACK_WIDTH = OVAL_TRACK.half_track_width
+
+project_to_centerline = OVAL_TRACK.project_to_centerline
+is_inside_track = OVAL_TRACK.is_inside_track
+dist_to_boundary = OVAL_TRACK.dist_to_boundary
