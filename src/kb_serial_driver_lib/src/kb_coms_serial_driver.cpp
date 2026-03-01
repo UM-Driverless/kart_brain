@@ -40,6 +40,7 @@ SerialDriver::SerialDriver(const std::string& port,
 SerialDriver::~SerialDriver()
 {
     stop();
+    while (!tx_queue_.empty()) tx_queue_.pop();
 }
 
 /* ============================================================
@@ -98,8 +99,12 @@ void SerialDriver::stop()
 void SerialDriver::send(uint8_t type,
                         const std::vector<uint8_t>& payload)
 {
+    if (payload.size() > 251)
+        return;
+    
     std::lock_guard<std::mutex> lock(tx_mutex_);
     tx_queue_.push(build_frame(type, payload));
+    std::cerr << "Numero de mensajes en la cola: " << tx_queue_.size() << std::endl;
     tx_cv_.notify_one();
 }
 
@@ -158,7 +163,7 @@ return rx_timeout_.load();
 void SerialDriver::supervisor_loop()
 {
     while (running_) {
-        if (fd_ < 0) {
+        if (fd_ < 0 && !rx_thread_.joinable() && !tx_thread_.joinable()) {
             if (open_port()) {
                 rx_thread_ = std::thread(&SerialDriver::rx_loop, this);
                 tx_thread_ = std::thread(&SerialDriver::tx_loop, this);
@@ -186,6 +191,7 @@ void SerialDriver::supervisor_loop()
  */
 bool SerialDriver::open_port()
 {
+    
     fd_ = open(port_.c_str(), O_RDWR | O_NOCTTY);
     if (fd_ < 0)
         return false;
@@ -196,6 +202,9 @@ bool SerialDriver::open_port()
         close_port();
         return false;
     }
+
+    // Limpia todos los bytes que ya están en el buffer
+    tcflush(fd_, TCIFLUSH);
     
     cfmakeraw(&tty);
     cfsetispeed(&tty, baudrate_to_flag(baudrate_));
@@ -221,6 +230,8 @@ void SerialDriver::close_port()
 {
     if (fd_ >= 0)
     {
+        // Limpia todos los bytes que ya están en el buffer
+        tcflush(fd_, TCIFLUSH);
         close(fd_);
         fd_ = -1;
     }
@@ -258,8 +269,7 @@ void SerialDriver::rx_loop()
 
         uint16_t processed = 0; // Contador de bytes procesados
 
-        for (uint16_t i = 0; i < n; ++i){
-            std::cerr << "El bytes es: " << buffer[i] << "y ocupa el lugar " << i << std::endl;
+        for (uint16_t i = 0; i < bytes_in_buffer; ++i){
             if(process_byte(buffer[i])) {
                 processed++;
                 break;
@@ -301,7 +311,7 @@ void SerialDriver::tx_loop()
 
         tx_cv_.wait(lock, [&]()
         {
-            return !tx_queue_.empty() || !running_;
+            return !tx_queue_.empty() || !running_ || fd_ < 0;
         });
 
         if (!running_)
@@ -340,25 +350,6 @@ int SerialDriver::process_byte(uint8_t byte)
 {
     auto now = std::chrono::steady_clock::now();
 
-    // if (state_ != State::WAIT_SOF &&
-    //     now - frame_start_ > FRAME_TIMEOUT)
-    // {
-    //     rx_timeout_++;
-    //     state_ = State::WAIT_SOF;
-    // }
-
-    if (state_ == State::WAIT_SOF)
-        std::cerr << "WAIT_SOF" << std::endl;
-    else if (state_ == State::LEN)
-        std::cerr << "WAIT_LEN" << std::endl;
-    else if (state_ == State::TYPE)
-        std::cerr << "WAIT_TYPE" << std::endl;
-    else if (state_ == State::PAYLOAD)
-        std::cerr << "WAIT_PAYLOAD" << std::endl;
-    else if (state_ == State::CRC)
-        std::cerr << "WAIT_CRC" << std::endl;
-    
-
     switch (state_)
     {
         case State::WAIT_SOF:
@@ -366,6 +357,9 @@ int SerialDriver::process_byte(uint8_t byte)
             {
                 frame_start_ = now;
                 state_ = State::LEN;
+                payload_.clear();
+                len_ = 0;
+                index_ = 0;
             }
             break;
 
@@ -387,7 +381,7 @@ int SerialDriver::process_byte(uint8_t byte)
 
         case State::PAYLOAD:
             payload_.push_back(byte); // agrega el byte al final
-            if (payload_.size() >= len_)
+            if (payload_.size() == len_)
                 state_ = State::CRC;
             break;
 
@@ -400,8 +394,8 @@ int SerialDriver::process_byte(uint8_t byte)
                 frame.payload.assign(payload_.begin(),
                      payload_.begin() + len_);
                 rx_ok_++;
-                std::cout << "Mensaje recibido correctamente, llamando a callback de nodo ros" << std::endl;
                 callback_(frame);
+                state_ = State::WAIT_SOF;
 
                 // End of msg
                 return 1;

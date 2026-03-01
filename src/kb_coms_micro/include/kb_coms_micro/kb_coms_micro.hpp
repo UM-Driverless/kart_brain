@@ -12,18 +12,66 @@ class KB_coms_micro : public rclcpp::Node {
 
     ~KB_coms_micro();
 
-  private:
-    void rx_callback(const SerialDriver::Frame &frame);
+    void kb_coms_OrinHeartbeat();
 
-    void tx_callback(const kb_interfaces::msg::Frame::SharedPtr msg);
+    enum  class message_type_t : uint8_t{
+      // ==========================
+      // ESP32 --> Orin (0x01 - 0x1F)
+      // ==========================
+      ESP_ACT_SPEED           = 0x01,
+      ESP_ACT_ACCELERATION    = 0x02,
+      ESP_ACT_BRAKING         = 0x03,
+      ESP_ACT_STEERING        = 0x04,
+      ESP_MISION              = 0x05,
+      ESP_MACHINE_STATE       = 0x06,
+      ESP_ACT_SHUTDOWN        = 0x07,
+      ESP_HEARTBEAT           = 0x08,
+      ESP_COMPLETE            = 0x09,
+
+      // ==========================
+      // Orin --> ESP32 (0x20 - 0x3F)
+      // ==========================
+      ORIN_TARG_THROTTLE      = 0x20,
+      ORIN_TARG_BRAKING       = 0x21,
+      ORIN_TARG_STEERING      = 0x22,
+      ORIN_MISION             = 0x23,
+      ORIN_MACHINE_STATE      = 0x24,
+      ORIN_HEARTBEAT          = 0x25,
+      ORIN_SHUTDOWN           = 0x26,
+      ORIN_COMPLETE           = 0x27,
+
+      // ==========================
+      // Others (0x40 - 0xFF)
+      // ==========================
+    };
+
+  private:
+    void kb_coms_RXcallback(const SerialDriver::Frame &frame);
+
+    void kb_coms_TXcallback(const kb_interfaces::msg::Frame::SharedPtr msg);
 
     std::unique_ptr<SerialDriver> serial_;
 
+    rclcpp::TimerBase::SharedPtr timer_;
+
     // Declaration of all publishers
     rclcpp::Publisher<kb_interfaces::msg::Frame>::SharedPtr esp_heart_pub_;
+    rclcpp::Publisher<kb_interfaces::msg::Frame>::SharedPtr esp_speed_pub_;
+    rclcpp::Publisher<kb_interfaces::msg::Frame>::SharedPtr esp_acceleration_pub_;
+    rclcpp::Publisher<kb_interfaces::msg::Frame>::SharedPtr esp_braking_pub_;
+    rclcpp::Publisher<kb_interfaces::msg::Frame>::SharedPtr esp_steering_pub_;
+    rclcpp::Publisher<kb_interfaces::msg::Frame>::SharedPtr esp_mision_pub_;
+    rclcpp::Publisher<kb_interfaces::msg::Frame>::SharedPtr esp_machine_state_pub_;
+    rclcpp::Publisher<kb_interfaces::msg::Frame>::SharedPtr esp_shutdown_pub_;
 
     // Declaration of all subscribers
-    rclcpp::Subscription<kb_interfaces::msg::Frame>::SharedPtr tx_sub_;
+    rclcpp::Subscription<kb_interfaces::msg::Frame>::SharedPtr orin_throttle_sub_;
+    rclcpp::Subscription<kb_interfaces::msg::Frame>::SharedPtr orin_brake_sub_;
+    rclcpp::Subscription<kb_interfaces::msg::Frame>::SharedPtr orin_steering_sub_;
+    rclcpp::Subscription<kb_interfaces::msg::Frame>::SharedPtr orin_machine_state_sub_;
+    rclcpp::Subscription<kb_interfaces::msg::Frame>::SharedPtr orin_mision_sub_;
+    rclcpp::Subscription<kb_interfaces::msg::Frame>::SharedPtr orin_heartbeat_sub_;
+    rclcpp::Subscription<kb_interfaces::msg::Frame>::SharedPtr orin_shutdown_sub_;
 };
 
 #endif // KB_COMS_MICRO_HPP_
